@@ -285,6 +285,7 @@ case ${COMMAND} in
       if [ -e "/tmp/$FILE_NAME" ]; then
         rm "$FILE_PATH"
         mv "/tmp/$FILE_NAME" "$FILE_PATH"
+        chmod +x "$FILE_PATH"
       fi
     done
   ;;
