@@ -378,10 +378,19 @@
           tableData.setProperty(totalsRow, col, 'style', 'color: darkblue;');
         }
         
+        // create a view that only shows users with traffic >= 1M
+        var tableView = new google.visualization.DataView(tableData);
+        var rows = [];
+        for (var row = 0; row < tableData.getNumberOfRows(); row++) {
+          if (tableData.getValue(row, 1) >= 1 || tableData.getValue(row, 4) >= 1) {
+            rows.push(row);
+          }
+        }
+        tableView.setRows(rows);
         // show table
         var tableVis = new google.visualization.Table(document.getElementById('table_div'));
         tableVis.draw(
-          tableData, 
+          tableView, 
           {
             allowHtml: true, 
             sortColumn: 1, 
@@ -389,10 +398,22 @@
           }
         );
 
+        // create a view that only shows users with traffic >= 1M
+        var chartView = new google.visualization.DataView(chartData);
+        var cols = [0];
+        for (var col = 1; col < chartData.getNumberOfColumns(); col++) {
+          for (var row = 0; row < chartData.getNumberOfRows(); row++) {
+            if (chartData.getValue(row, col) >= 1) {
+              cols.push(col);
+              break;
+            }
+          }
+        }
+        chartView.setColumns(cols);
         // show chart
         var chartVis = new google.visualization.LineChart(document.getElementById('chart_div'));
         chartVis.draw(
-          chartData, 
+          chartView, 
           {
             width: "80%", 
             height: 450, 
