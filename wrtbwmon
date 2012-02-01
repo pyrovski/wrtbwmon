@@ -22,29 +22,20 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-LAN_IFACE=$(nvram get lan_ifname)
-WAN_IFACE=$(nvram get wan_ifname)
-
 # init default settings
 INTERNAL_NETMASK=127.0.0.1
+DOWNLOAD_BASE=http://gitorious.org/wrtbwmon/wrtbwmon/blobs/raw/master
+DOWNLOAD_FILE_LIST="/opt/bin/wrtbwmon /www/user/data/traffic_chart.html"
 
 # overwrite settings specified in USER_RC
 USER_RC="$(dirname $0)/wrtbwmon.rc"
 [ -e "$USER_RC" ] && . "$USER_RC"
 
-# check/create directories
+# directories
 WWW_DIR=/tmp/www
-[ -e $WWW_DIR ] || mkdir $WWW_DIR
-[ -e /opt/tmp/www ] || mkdir /opt/tmp/www
 DATA_DIR=/opt/tmp/www/data
-[ -e $DATA_DIR ] || mkdir $DATA_DIR
-
-# check/create symlinks
-TMP_DIR=/www/user
-[ -e $TMP_DIR ] || ln -s $WWW_DIR $TMP_DIR
-BACKUP_DIR=$TMP_DIR/data
-[ -e $BACKUP_DIR ] || ln -s $DATA_DIR $BACKUP_DIR
-
+USER_WWW_DIR=/www/user
+BACKUP_DIR=$USER_WWW_DIR/data
 
 lock()
 {
@@ -65,7 +56,7 @@ unlock()
 
 usage()
 {
-  echo "Usage : $0 {remove|setup|update|backup|backup-and-clear-db|publish_users} database_name"
+  echo "Usage : $0 {remove|setup|publish_users|download_scripts} | {update|backup|backup-and-clear-db} database_name"
   exit 1
 }
 
@@ -108,17 +99,6 @@ update_db()
 [ -z "${1}" ] && echo "ERROR : Missing argument 1: command" && usage
 COMMAND=${1}
 
-[ -z "${2}" ] && echo "ERROR : Missing argument 2: database name" && usage
-DATABASE_NAME=${2}
-
-# use separate files for monthly, daily and hourly stats
-DATABASE_FILE_BASE="$TMP_DIR/${DATABASE_NAME}"
-DATABASE_FILE_M="${DATABASE_FILE_BASE}_$(date "+%Y-%m").html"
-DATABASE_FILE_D="${DATABASE_FILE_BASE}_$(date "+%Y-%m-%d").html"
-DATABASE_FILE_H="${DATABASE_FILE_BASE}_$(date "+%Y-%m-%d_%H").html"
-
-HTMLFILE="$WWW_DIR/${DATABASE_NAME}.html"
-
 
 case ${COMMAND} in
 
@@ -137,6 +117,16 @@ case ${COMMAND} in
     ;;
 
   "setup" )
+
+    LAN_IFACE=$(nvram get lan_ifname)
+    WAN_IFACE=$(nvram get wan_ifname)
+
+    # check/create directories and symlinks
+    [ -e $WWW_DIR ] || mkdir $WWW_DIR
+    [ -e /opt/tmp/www ] || mkdir /opt/tmp/www
+    [ -e $DATA_DIR ] || mkdir $DATA_DIR
+    [ -e $USER_WWW_DIR ] || ln -s $WWW_DIR $USER_WWW_DIR
+    [ -e $BACKUP_DIR ] || ln -s $DATA_DIR $BACKUP_DIR
 
     # create the ACCOUNTING chains
     iptables -N ACCOUNTING_IN 2> /dev/null
@@ -171,14 +161,29 @@ case ${COMMAND} in
     ;;
     
   "backup-and-clear-db" )
+    [ -z "${2}" ] && echo "ERROR : Missing argument 2: database name" && usage
+    DATABASE_NAME=${2}
+    DATABASE_FILE_BASE="$USER_WWW_DIR/${DATABASE_NAME}"
     mv ${DATABASE_FILE_BASE}* ${BACKUP_DIR}    
     ;;
   
   "backup" )
+    [ -z "${2}" ] && echo "ERROR : Missing argument 2: database name" && usage
+    DATABASE_NAME=${2}
+    DATABASE_FILE_BASE="$USER_WWW_DIR/${DATABASE_NAME}"
     cp ${DATABASE_FILE_BASE}* ${BACKUP_DIR}
     ;;
   
   "update" )
+    [ -z "${2}" ] && echo "ERROR : Missing argument 2: database name" && usage
+    DATABASE_NAME=${2}
+    DATABASE_FILE_BASE="$USER_WWW_DIR/${DATABASE_NAME}"
+
+    # use separate files for monthly, daily and hourly stats
+    DATABASE_FILE_M="${DATABASE_FILE_BASE}_$(date "+%Y-%m").html"
+    DATABASE_FILE_D="${DATABASE_FILE_BASE}_$(date "+%Y-%m-%d").html"
+    DATABASE_FILE_H="${DATABASE_FILE_BASE}_$(date "+%Y-%m-%d_%H").html"
+    
     # restore backup files
     [ -f "${DATABASE_FILE_M}" ] || cp ${BACKUP_DIR}/$(basename ${DATABASE_FILE_M}) $(dirname ${DATABASE_FILE_M})
     [ -f "${DATABASE_FILE_D}" ] || cp ${BACKUP_DIR}/$(basename ${DATABASE_FILE_D}) $(dirname ${DATABASE_FILE_D})
@@ -271,6 +276,18 @@ case ${COMMAND} in
     cat $USERS_OUTPUT
 
     ;;
+    
+  "download_scripts" )
+    for FILE_PATH in $DOWNLOAD_FILE_LIST; do
+      FILE_NAME=$(basename "$FILE_PATH")
+      rm "/tmp/$FILE_NAME"
+      wget --output-document="/tmp/$FILE_NAME" "$DOWNLOAD_BASE/$FILE_NAME"
+      if [ -e "/tmp/$FILE_NAME" ]; then
+        echo rm "$FILE_PATH"
+        echo mv "/tmp/$FILE_NAME" "$FILE_PATH"
+      fi
+    done
+  ;;
 
   *)
     usage
