@@ -281,10 +281,10 @@ case ${COMMAND} in
     for FILE_PATH in $DOWNLOAD_FILE_LIST; do
       FILE_NAME=$(basename "$FILE_PATH")
       rm "/tmp/$FILE_NAME"
-      wget --output-document="/tmp/$FILE_NAME" "$DOWNLOAD_BASE/$FILE_NAME"
+      wget -O "/tmp/$FILE_NAME" "$DOWNLOAD_BASE/$FILE_NAME"
       if [ -e "/tmp/$FILE_NAME" ]; then
-        echo rm "$FILE_PATH"
-        echo mv "/tmp/$FILE_NAME" "$FILE_PATH"
+        rm "$FILE_PATH"
+        mv "/tmp/$FILE_NAME" "$FILE_PATH"
       fi
     done
   ;;
