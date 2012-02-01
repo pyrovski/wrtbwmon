@@ -152,6 +152,7 @@
       $('#datepicker').datepicker({
         maxDate: '+0',
         onSelect: function(dateText, instance) {
+          updateShowDate();
         }
       });
       $('#datepicker').datepicker('setDate', new Date());
