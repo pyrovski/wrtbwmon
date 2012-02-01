@@ -1,0 +1,279 @@
+#!/bin/sh
+#
+# Traffic logging tool for OpenWRT-based routers
+#
+# Created by Dorian Scholz (dorianscholz AT gmx.de)
+#
+# Based on work from Emmanuel Brucy (e.brucy AT qut.edu.au)
+# Based on work from Fredrik Erlandsson (erlis AT linux.nu)
+# Based on traff_graph script by twist - http://wiki.openwrt.org/RrdTrafficWatch
+# 
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
+LAN_IFACE=$(nvram get lan_ifname)
+WAN_IFACE=$(nvram get wan_ifname)
+
+# init default settings
+INTERNAL_NETMASK=127.0.0.1
+
+# overwrite settings specified in USER_RC
+USER_RC="$(dirname $0)/wrtbwmon.rc"
+[ -e "$USER_RC" ] && . "$USER_RC"
+
+# check/create directories
+WWW_DIR=/tmp/www
+[ -e $WWW_DIR ] || mkdir $WWW_DIR
+[ -e /opt/tmp/www ] || mkdir /opt/tmp/www
+DATA_DIR=/opt/tmp/www/data
+[ -e $DATA_DIR ] || mkdir $DATA_DIR
+
+# check/create symlinks
+TMP_DIR=/www/user
+[ -e $TMP_DIR ] || ln -s $WWW_DIR $TMP_DIR
+BACKUP_DIR=$TMP_DIR/data
+[ -e $BACKUP_DIR ] || ln -s $DATA_DIR $BACKUP_DIR
+
+
+lock()
+{
+  while [ -f /tmp/wrtbwmon.lock ]; do
+    if [ ! -d /proc/$(cat /tmp/wrtbwmon.lock) ]; then
+      echo "WARNING : Lockfile detected but process $(cat /tmp/wrtbwmon.lock) does not exist !"
+      rm -f /tmp/wrtbwmon.lock
+    fi
+    sleep 1
+  done
+  echo $$ > /tmp/wrtbwmon.lock
+}
+
+unlock()
+{
+  rm -f /tmp/wrtbwmon.lock
+}
+
+usage()
+{
+  echo "Usage : $0 {remove|setup|update|backup|backup-and-clear-db|publish_users} database_name"
+  exit 1
+}
+
+
+update_db()
+{
+  DATABASE_FILE=$1
+  MAC=$2
+  NEW_IN=$3
+  NEW_OUT=$4
+  NEW_IN_EXTERNAL=$5
+  NEW_OUT_EXTERNAL=$6
+  
+  echo "DEBUG: updating $DATABASE_FILE"
+  LINE=$(grep ${MAC} ${DATABASE_FILE})
+  if [ -z "${LINE}" ]; then
+    echo "DEBUG: ${MAC} is a new host!"
+    EXTERNAL_IN=0
+    EXTERNAL_OUT=0
+    INTERNAL_IN=0
+    INTERNAL_OUT=0
+  else
+    EXTERNAL_IN=$(echo ${LINE} | cut -f2 -s -d, )
+    EXTERNAL_OUT=$(echo ${LINE} | cut -f3 -s -d, )
+    INTERNAL_IN=$(echo ${LINE} | cut -f4 -s -d, )
+    INTERNAL_OUT=$(echo ${LINE} | cut -f5 -s -d, )
+  fi
+  
+  INTERNAL_IN=$((${INTERNAL_IN}+${NEW_IN}))
+  INTERNAL_OUT=$((${INTERNAL_OUT}+${NEW_OUT}))
+  EXTERNAL_IN=$((${EXTERNAL_IN}+${NEW_IN_EXTERNAL}))
+  EXTERNAL_OUT=$((${EXTERNAL_OUT}+${NEW_OUT_EXTERNAL}))
+
+  grep -v "${MAC}" ${DATABASE_FILE} > /tmp/db_$$.tmp
+  mv /tmp/db_$$.tmp ${DATABASE_FILE}
+  echo ${MAC},${EXTERNAL_IN},${EXTERNAL_OUT},${INTERNAL_IN},${INTERNAL_OUT},$(date "+%d-%m-%Y %H:%M") >> ${DATABASE_FILE}
+}
+
+# check command line args
+[ -z "${1}" ] && echo "ERROR : Missing argument 1: command" && usage
+COMMAND=${1}
+
+[ -z "${2}" ] && echo "ERROR : Missing argument 2: database name" && usage
+DATABASE_NAME=${2}
+
+# use separate files for monthly, daily and hourly stats
+DATABASE_FILE_BASE="$TMP_DIR/${DATABASE_NAME}"
+DATABASE_FILE_M="${DATABASE_FILE_BASE}_$(date "+%Y-%m").html"
+DATABASE_FILE_D="${DATABASE_FILE_BASE}_$(date "+%Y-%m-%d").html"
+DATABASE_FILE_H="${DATABASE_FILE_BASE}_$(date "+%Y-%m-%d_%H").html"
+
+HTMLFILE="$WWW_DIR/${DATABASE_NAME}.html"
+
+
+case ${COMMAND} in
+
+  "remove" )
+    echo "removing jumps to accounting chains"
+    iptables -D FORWARD $(iptables -L FORWARD --line-numbers | grep ACCOUNTING | grep -m 1 -o [0-9]*)
+    while [ $? -eq 0 ]; do
+      iptables -D FORWARD $(iptables -L FORWARD --line-numbers | grep ACCOUNTING | grep -m 1 -o [0-9]*)
+    done
+    echo "flushing accounting chains"
+    iptables -F ACCOUNTING_IN
+    iptables -F ACCOUNTING_OUT
+    echo "removing accounting chains"
+    iptables -X ACCOUNTING_IN
+    iptables -X ACCOUNTING_OUT
+    ;;
+
+  "setup" )
+
+    # create the ACCOUNTING chains
+    iptables -N ACCOUNTING_IN 2> /dev/null
+    iptables -N ACCOUNTING_OUT 2> /dev/null
+
+    # check if jumps to the ACCOUNTING chains are still at the start of the FORWARD chain
+    iptables -L FORWARD --line-numbers -n | grep "ACCOUNTING" | grep "^1 "
+    if [ $? -ne 0 ]; then
+      # remove old jump rules
+      iptables -D FORWARD $(iptables -L FORWARD --line-numbers | grep ACCOUNTING | grep -m 1 -o "[0-9]*")
+      while [ $? -eq 0 ]; do
+        iptables -D FORWARD $(iptables -L FORWARD --line-numbers | grep ACCOUNTING | grep -m 1 -o "[0-9]*")
+      done
+      # insert new jump rules at start of FORWARD chain
+      iptables -I FORWARD -i ${WAN_IFACE} -j ACCOUNTING_IN
+      iptables -I FORWARD -o ${WAN_IFACE} -j ACCOUNTING_OUT
+    fi
+
+    #For each host in the ARP table
+    grep ${LAN_IFACE} /proc/net/arp | while read IP TYPE FLAGS MAC MASK IFACE
+    do
+      #Add iptables rules (if non existing).
+      iptables -nL ACCOUNTING_IN | grep "${IP} " > /dev/null
+      if [ $? -ne 0 ]; then
+        iptables -A ACCOUNTING_IN -d ${IP} -s ${INTERNAL_NETMASK} -j RETURN
+        iptables -A ACCOUNTING_IN -d ${IP} -s ! ${INTERNAL_NETMASK} -j RETURN
+        
+        iptables -A ACCOUNTING_OUT -s ${IP} -d ${INTERNAL_NETMASK} -j RETURN
+        iptables -A ACCOUNTING_OUT -s ${IP} -d ! ${INTERNAL_NETMASK} -j RETURN
+      fi
+    done
+    ;;
+    
+  "backup-and-clear-db" )
+    mv ${DATABASE_FILE_BASE}* ${BACKUP_DIR}    
+    ;;
+  
+  "backup" )
+    cp ${DATABASE_FILE_BASE}* ${BACKUP_DIR}
+    ;;
+  
+  "update" )
+    # restore backup files
+    [ -f "${DATABASE_FILE_M}" ] || cp ${BACKUP_DIR}/$(basename ${DATABASE_FILE_M}) $(dirname ${DATABASE_FILE_M})
+    [ -f "${DATABASE_FILE_D}" ] || cp ${BACKUP_DIR}/$(basename ${DATABASE_FILE_D}) $(dirname ${DATABASE_FILE_D})
+    [ -f "${DATABASE_FILE_H}" ] || cp ${BACKUP_DIR}/$(basename ${DATABASE_FILE_H}) $(dirname ${DATABASE_FILE_H})
+
+    lock
+
+    #Read and reset counters
+    iptables -L ACCOUNTING_IN -vnxZ -t filter > /tmp/traffic_in_$$.tmp
+    iptables -L ACCOUNTING_OUT -vnxZ -t filter > /tmp/traffic_out_$$.tmp
+
+    grep -v "0x0" /proc/net/arp | egrep "[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+" | while read IP TYPE FLAGS MAC MASK IFACE
+    do
+      #Add new data to the graph. Count in Kbs to deal with 16 bits signed values (up to 2G only)
+      #Have to use temporary files because of crappy busybox shell
+      echo "Updating stats for ${IP}"
+      
+      # incoming traffic
+      grep ${IP} /tmp/traffic_in_$$.tmp | while read PKTS BYTES TARGET PROT OPT IFIN IFOUT SRC DST
+      do
+        # check for exclude filter, to distinguish external and internal traffic
+        echo "${SRC} ${DST}" | grep "!" > /dev/null
+        if [ $? -ne 0 ]; then
+          echo "Adding internal traffic from ${SRC} to ${DST}"
+          [ "${DST}" = "${IP}" ] && echo $((${BYTES}/1000)) > /tmp/in_$$.tmp
+        else
+          echo "Adding external traffic from ${SRC} to ${DST}"
+          [ "${DST}" = "${IP}" ] && echo $((${BYTES}/1000)) > /tmp/in_external_$$.tmp
+        fi
+      done
+      IN=$(cat /tmp/in_$$.tmp)
+      IN_EXTERNAL=$(cat /tmp/in_external_$$.tmp)
+      rm -f /tmp/in_$$.tmp
+      rm -f /tmp/in_external_$$.tmp
+
+      # outgoing traffic
+      grep ${IP} /tmp/traffic_out_$$.tmp | while read PKTS BYTES TARGET PROT OPT IFIN IFOUT SRC DST
+      do
+        # check for exclude filter, to distinguish external and internal traffic
+        echo "${SRC} ${DST}" | grep "!" > /dev/null
+        if [ $? -ne 0 ]; then
+          echo "Adding internal traffic from ${SRC} to ${DST}"
+          [ "${SRC}" = "${IP}" ] && echo $((${BYTES}/1000)) > /tmp/out_$$.tmp
+        else
+          echo "Adding external traffic from ${SRC} to ${DST}"
+          [ "${SRC}" = "${IP}" ] && echo $((${BYTES}/1000)) > /tmp/out_external_$$.tmp
+        fi
+      done
+      OUT=$(cat /tmp/out_$$.tmp)
+      OUT_EXTERNAL=$(cat /tmp/out_external_$$.tmp)
+      rm -f /tmp/out_$$.tmp
+      rm -f /tmp/out_external_$$.tmp
+      
+      if [ ${IN} -gt 0 -o ${OUT} -gt 0 -o ${IN_EXTERNAL} -gt 0 -o ${OUT_EXTERNAL} -gt 0 ];  then
+        echo "DEBUG : New traffic for ${MAC} since last update : internal ${IN}k:${OUT}k, external ${IN_EXTERNAL}k:${OUT_EXTERNAL}k"
+      
+        update_db ${DATABASE_FILE_M} ${MAC} ${IN} ${OUT} ${IN_EXTERNAL} ${OUT_EXTERNAL}
+        update_db ${DATABASE_FILE_D} ${MAC} ${IN} ${OUT} ${IN_EXTERNAL} ${OUT_EXTERNAL}
+        update_db ${DATABASE_FILE_H} ${MAC} ${IN} ${OUT} ${IN_EXTERNAL} ${OUT_EXTERNAL}
+      fi
+    done
+    
+    #Free some memory
+    rm -f /tmp/*_$$.tmp
+    unlock
+    ;;
+    
+  "publish_users" )
+    USERS_OUTPUT="/www/user/data/users.html"
+    
+    USERSFILE="/tmp/dnsmasq.leases"
+    egrep -o "([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2} [^ ]+ [^ ]+" $USERSFILE | while read MAC IP NAME
+    do
+      MAC=$(echo $MAC | tr '[a-z]' '[A-Z]')
+      grep -v "${MAC}" ${USERS_OUTPUT} > /tmp/users_$$.tmp
+      mv /tmp/users_$$.tmp ${USERS_OUTPUT}
+      echo ${MAC},${NAME} >> ${USERS_OUTPUT}
+    done
+
+    USERSFILE="/etc/dnsmasq.conf"
+    [ -f "${USERSFILE}" ] || USERSFILE="/tmp/dnsmasq.conf"
+    egrep -o "([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2},[^,]+" $USERSFILE | while IFS=, read MAC NAME
+    do
+      MAC=$(echo $MAC | tr '[a-z]' '[A-Z]')
+      grep -v "${MAC}" ${USERS_OUTPUT} > /tmp/users_$$.tmp
+      mv /tmp/users_$$.tmp ${USERS_OUTPUT}
+      echo ${MAC},${NAME} >> ${USERS_OUTPUT}
+    done
+    
+    cat $USERS_OUTPUT
+
+    ;;
+
+  *)
+    usage
+    ;;
+
+esac
