@@ -2,10 +2,40 @@
 <head>
   <title>traffic_chart</title>
   <link rel="stylesheet" href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.14/themes/base/jquery-ui.css" type="text/css" media="all" />
+  <style type="text/css">
+    body { color: #333; margin: 1em 2em; font-family: sans; background-color: #fafafa; }
+    a { font-size: x-small; font-weight: normal; text-decoration: none; color: #888; }
+    h1 { font-weight: normal; display: inline; margin-right: 1em; }
+    h2 { font-weight: normal; }
+    #result_div { display: none; background-color: #fff; }
+    #result { font-size: small; }
+    #table_div { margin-top: 1em; }
+    #chart_div { margin-top: 1em; }
+    .styled-input select {
+      background: transparent;
+      padding: 0;
+      border: 0;
+      margin: 0;
+    }
+    .styled-input input {
+      background: transparent;
+      border: 0;
+    }
+    .styled-input a {
+      font-size: medium;
+      padding: 3px;
+      margin: 0;
+    }
+    .styled-input {
+      padding: 3px;
+      border: 1px solid #ccc;
+      margin: 0 10 0 0;
+    }
+  </style>
 
   <script type="text/javascript" src="https://www.google.com/jsapi"></script>
   <script type="text/javascript">
-    var repr = function(obj) {
+      var repr = function(obj) {
       var res = ""
       var type = typeOf(obj)
       if (type == "object") {
@@ -115,7 +145,7 @@
       
       updateShowDate = function() {
         showDate = $('#datepicker').datepicker('getDate'); 
-        logOut('switching to ' + showDate); 
+        logOut('\n\nswitching to ' + showDate); 
         getTrafficData(showDate, showTimespan); 
       }
       $('#datepicker').keyup(updateShowDate);
@@ -133,7 +163,7 @@
         } else if (showTimespan == 'month') {
           date.setMonth(date.getMonth() + delta);
         } else if (showTimespan == 'year') {
-          date.setYear(date.getYear() + delta);
+          date.setYear(date.getFullYear() + delta);
         }
         datepicker.datepicker('setDate', date);
         updateShowDate();
@@ -193,7 +223,8 @@
           }
         }
       } else if (timespan == 'month') {
-        for (var day = 1; day <= 31; day++) {
+        lastDayInMonth = new Date(date.getYear(), date.getMonth() + 1, 0);
+        for (var day = 1; day <= lastDayInMonth.getDate(); day++) {
           date.setDate(day);
           strings.push(getDateString(date.getFullYear(), date.getMonth() + 1, date.getDate(), undefined));
           date.setDate(day + 1);
@@ -220,28 +251,41 @@
     
     function getTrafficData(date, timespan) {
       var dateStrings = getDateStrings(date, timespan);
-      //logOut('showing dates: ' + dateStrings);
+      logOut('getTrafficData(): showing dates: ' + dateStrings);
+      numFilesInQueue += dateStrings.length;
       for (var i in dateStrings) {
         if (trafficDataSet[dateStrings[i]] && !reloadStrings[dateStrings[i]]) {
-          //logOut('skipping download: ' + dateStrings[i]);
+          logOut('getTrafficData(): skipping download: ' + dateStrings[i]);
+          numFilesInQueue--;
         } else {
           downloadTrafficData(dateStrings[i]);
         }
       }
-      if (numFilesInQueue == 0) {
-        updateCharts();
-      }
+      updateCharts();
     }
     
     // show the table, if downloading files is done
     function updateCharts() {
       // check if all libraries and data files have been downloaded
       if (googleLoaded && numFilesInQueue == 0) {
+        
+        // generate date string to show in title
+        var showDateString = showDate.getFullYear();
+        if (showTimespan != 'year') {
+          showDateString += '-' + pad(showDate.getMonth() + 1, 2);
+          if (showTimespan != 'month') {
+            showDateString += '-' + pad(showDate.getDate(), 2);
+          }
+        }
+        $('#title').text('Traffic ' + showDateString);
+        
         // check if the data files contained any entries, as DD-WRT simply returns empty files instead of 404
         if (jQuery.isEmptyObject(macToID)) {
-          logOut('no data available for this date');
+          logOut('updateCharts(): no data available for this date');
+          document.getElementById('error_div').innerHTML  = '<h2>No data available for this date.</h2>';
           return;
         }
+        document.getElementById('error_div').innerHTML  = '';
         
         // init data table for the chart
         var chartData = new google.visualization.DataTable();
@@ -253,7 +297,7 @@
         for (var colNr in trafficTitles) {
           tableData.addColumn('number', trafficTitles[colNr]);
         }
-        
+
         // assign sequential user ids to mac addresses, to use as row/column index for the data tables
         var userId = 1;
         for (var mac in macToID) {
@@ -284,8 +328,12 @@
           var chartRow = createArray(chartData.getNumberOfColumns(), 0);
           chartRow[0] = dateString;
           
-          // parse taffic data
+          // parse traffic data
           var trafficData = trafficDataSet[dateString];
+          if (trafficData === undefined) { 
+            logOut('updateCharts(): no data available for: ' + dateString);
+            continue; 
+          }
           for (var trafficRow = 0; trafficRow < trafficData.length; trafficRow++) {
             var userId = macToID[trafficData[trafficRow][1]];
             // put selected traffic column entry in the chart row
@@ -318,31 +366,28 @@
               maxRow = row;
             }
           }
-          tableData.setProperty(maxRow, col, 'style', 'font-weight: bold; color: brown;');
+          tableData.setProperty(maxRow, col, 'style', 'color: darkred;');
           if (col == 1) {
-            tableData.setProperty(maxRow, 0, 'style', 'font-weight: bold; color: brown;');
+            tableData.setProperty(maxRow, 0, 'style', 'color: darkred;');
           }
         }
         var totalsRow = tableData.addRow(totals);
         // format table data
         for (var col = 0; col < tableData.getNumberOfColumns(); col++) {
           formatter.format(tableData, col);
-          tableData.setProperty(totalsRow, col, 'style', 'font-weight: bold;');
+          tableData.setProperty(totalsRow, col, 'style', 'color: darkblue;');
         }
-        
-        // generate date string to show in title
-        var showDateString = showDate.getFullYear();
-        if (showTimespan != 'year') {
-          showDateString += '-' + pad(showDate.getMonth() + 1, 2);
-          if (showTimespan != 'month') {
-            showDateString += '-' + pad(showDate.getDate(), 2);
-          }
-        }
-        $('#title').text('Traffic ' + showDateString);
         
         // show table
         var tableVis = new google.visualization.Table(document.getElementById('table_div'));
-        tableVis.draw(tableData, {allowHtml: true, sortColumn: 1, width: 120 * tableData.getNumberOfColumns()});
+        tableVis.draw(
+          tableData, 
+          {
+            allowHtml: true, 
+            sortColumn: 1, 
+            width: 120 * tableData.getNumberOfColumns()
+          }
+        );
 
         // show chart
         var chartVis = new google.visualization.LineChart(document.getElementById('chart_div'));
@@ -350,23 +395,25 @@
           chartData, 
           {
             width: "80%", 
-            height: 500, 
-            pointSize: 7, 
-            title: trafficTitles[chartTrafficColumn] + ' ' + showDateString,
-            chartArea: {left: 80, top: 80},
+            height: 450, 
+            pointSize: 3, 
+            //title: trafficTitles[chartTrafficColumn] + ' ' + showDateString,
+            chartArea: {left: 80, top: 40},
             vAxis: {format: "#,##0 M"}
           }
         );
       } else {
-        //logOut('not all files loaded yet');
+        //logOut('updateCharts(): not all files loaded yet');
       }
     }
 
     // download and parse user data (comma seperated list: Name,MAC)
     function getUserData() {
+      url = 'users.html';
       numFilesInQueue++;
-      $.get('users.html', function(data) {
-        numFilesInQueue--;
+      //logOut('getUserData(): start downloading: ' + url);
+      var jqxhr = $.get(url, function(data, statusText, jqxhr) {
+        //logOut('getUserData(): success loading: ' + jqxhr.responseXML.baseURI + ': ' + data);
         users = {};
         var regex = /([^,]+),([^,]+)/;
         var lines = data.split('\n');
@@ -375,6 +422,12 @@
           if (match && match.length > 2) {
             users[match[1]] = match[2];
           }
+        }
+      }, 'text');
+      jqxhr.complete(function(jqxhr, statusText) { 
+        numFilesInQueue--; 
+        if (statusText == 'error') {
+          logOut('getUserData(): ' + statusText + ' loading ' + this.url + ', ' + numFilesInQueue + ' more to go...' + '\n  ' + jqxhr.statusText); 
         }
         updateCharts();
       });
@@ -386,9 +439,9 @@
       if (reloadStrings[dateString]) {
         url = '../' + url;
       }
-      numFilesInQueue++;
-      $.get(url, function(data) {
-        numFilesInQueue--;
+      //logOut('downloadTrafficData(): start downloading: ' + url);
+      var jqxhr = $.get(url, function(data, statusText, jqxhr) {
+        //logOut('downloadTrafficData(): success loading: ' + jqxhr.responseXML.baseURI + ': ' + data);
         var lines = data.split('\n');
         trafficDataSet[dateString] = [];
         for (var i in lines) {
@@ -409,37 +462,49 @@
             macToID[tokens[0]] = 1;
           }
         }
+      }, 'text');
+      jqxhr.complete(function(jqxhr, statusText) { 
+        numFilesInQueue--;
+        if (statusText == 'error') {
+          logOut('downloadTrafficData(): ' + statusText + ' loading ' + this.url + ', ' + numFilesInQueue + ' more to go...' + ' -> ' + jqxhr.statusText); 
+        }
         updateCharts();
       });
     }
   </script>
 </head>
 
-<body style="margin: 20 20 20 20; font-family: sans;">
+<body>
   <h1 id="title">Traffic</h1>
+  <span>
+    Period: 
+    <span class="styled-input">
+      <select id="timespan">
+        <option value="day">Day</option>
+        <option value="month">Month</option>
+        <option value="year">Year</option>
+      </select>
+    </span>
+    Date: 
+    <span class="styled-input">
+      <a href="#" id="prevPeriod">&lt;</a>
+      <input id="datepicker" size=4></input>
+      <a href="#" id="nextPeriod">&gt;</a>
+    </span>
+    Plot:
+    <span class="styled-input">
+      <select id="chart_column"></select>
+    </span>
+  </span>
   <p>
+    <div id="error_div"></div>
     <div id="table_div"></div>
     <div id="chart_div"></div>
   </p>
-  <p>
-    Period: 
-    <select id="timespan">
-      <option value="day">Day</option>
-      <option value="month">Month</option>
-      <option value="year">Year</option>
-    </select>
-    Date: 
-    <input id="prevPeriod" type="button" value="-"></input>
-    <input id="datepicker" size=10></input>
-    <input id="nextPeriod" type="button" value="+"></input>
-    Plot:
-    <select id="chart_column">
-    </select>
-  </p>
   <div>
-    <a href="#" onClick="$('#result_div').toggle()" style="font-size: x-small">toggle script log</a>
-    <div id="result_div" style="display: none; background-color: lightblue">
-      <input type="button" value='clear' onClick="$('#result').text('')"></input>
+    <a href="#" onClick="$('#result_div').toggle()">toggle script log</a>
+    <div id="result_div">
+      <a href="#" onClick="$('#result').text('')">clear script log</a>
       <pre id="result"></pre>
     </div>
   </div>
