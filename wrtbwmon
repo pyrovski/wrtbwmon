@@ -23,19 +23,20 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 # init default settings
+INSTALL_PREFIX=/opt
 INTERNAL_NETMASK=127.0.0.1
 DOWNLOAD_BASE=http://gitorious.org/wrtbwmon/wrtbwmon/blobs/raw/master
-DOWNLOAD_FILE_LIST="/opt/bin/wrtbwmon /www/user/data/traffic_chart.html"
-
-# overwrite settings specified in USER_RC
-USER_RC="$(dirname $0)/wrtbwmon.rc"
-[ -e "$USER_RC" ] && . "$USER_RC"
+DOWNLOAD_FILE_LIST="$INSTALL_PREFIX/bin/wrtbwmon /www/user/data/traffic_chart.html"
 
 # directories
 WWW_DIR=/tmp/www
 DATA_DIR=/opt/tmp/www/data
 USER_WWW_DIR=/www/user
 BACKUP_DIR=$USER_WWW_DIR/data
+
+# overwrite defaults with settings specified in USER_RC
+USER_RC="$INSTALL_PREFIX/etc/wrtbwmon.rc"
+[ -e "$USER_RC" ] && . "$USER_RC"
 
 lock()
 {
