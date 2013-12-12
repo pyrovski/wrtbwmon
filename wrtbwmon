@@ -7,17 +7,17 @@
 # Based on work from Emmanuel Brucy (e.brucy AT qut.edu.au)
 # Based on work from Fredrik Erlandsson (erlis AT linux.nu)
 # Based on traff_graph script by twist - http://wiki.openwrt.org/RrdTrafficWatch
-# 
+#
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 2
 # of the License, or (at your option) any later version.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
@@ -70,7 +70,7 @@ update_db()
   NEW_OUT=$4
   NEW_IN_EXTERNAL=$5
   NEW_OUT_EXTERNAL=$6
-  
+
   echo "DEBUG: updating $DATABASE_FILE"
   LINE=$(grep ${MAC} ${DATABASE_FILE})
   if [ -z "${LINE}" ]; then
@@ -85,7 +85,7 @@ update_db()
     INTERNAL_IN=$(echo ${LINE} | cut -f4 -s -d, )
     INTERNAL_OUT=$(echo ${LINE} | cut -f5 -s -d, )
   fi
-  
+
   INTERNAL_IN=$((${INTERNAL_IN}+${NEW_IN}))
   INTERNAL_OUT=$((${INTERNAL_OUT}+${NEW_OUT}))
   EXTERNAL_IN=$((${EXTERNAL_IN}+${NEW_IN_EXTERNAL}))
@@ -154,27 +154,27 @@ case ${COMMAND} in
       if [ $? -ne 0 ]; then
         iptables -A ACCOUNTING_IN -d ${IP} -s ${INTERNAL_NETMASK} -j RETURN
         iptables -A ACCOUNTING_IN -d ${IP} -s ! ${INTERNAL_NETMASK} -j RETURN
-        
+
         iptables -A ACCOUNTING_OUT -s ${IP} -d ${INTERNAL_NETMASK} -j RETURN
         iptables -A ACCOUNTING_OUT -s ${IP} -d ! ${INTERNAL_NETMASK} -j RETURN
       fi
     done
     ;;
-    
+
   "backup-and-clear-db" )
     [ -z "${2}" ] && echo "ERROR : Missing argument 2: database name" && usage
     DATABASE_NAME=${2}
     DATABASE_FILE_BASE="$USER_WWW_DIR/${DATABASE_NAME}"
-    mv ${DATABASE_FILE_BASE}* ${BACKUP_DIR}    
+    mv ${DATABASE_FILE_BASE}* ${BACKUP_DIR}
     ;;
-  
+
   "backup" )
     [ -z "${2}" ] && echo "ERROR : Missing argument 2: database name" && usage
     DATABASE_NAME=${2}
     DATABASE_FILE_BASE="$USER_WWW_DIR/${DATABASE_NAME}"
     cp ${DATABASE_FILE_BASE}* ${BACKUP_DIR}
     ;;
-  
+
   "update" )
     [ -z "${2}" ] && echo "ERROR : Missing argument 2: database name" && usage
     DATABASE_NAME=${2}
@@ -184,7 +184,7 @@ case ${COMMAND} in
     DATABASE_FILE_M="${DATABASE_FILE_BASE}_$(date "+%Y-%m").html"
     DATABASE_FILE_D="${DATABASE_FILE_BASE}_$(date "+%Y-%m-%d").html"
     DATABASE_FILE_H="${DATABASE_FILE_BASE}_$(date "+%Y-%m-%d_%H").html"
-    
+
     # restore backup files
     [ -f "${DATABASE_FILE_M}" ] || cp ${BACKUP_DIR}/$(basename ${DATABASE_FILE_M}) $(dirname ${DATABASE_FILE_M})
     [ -f "${DATABASE_FILE_D}" ] || cp ${BACKUP_DIR}/$(basename ${DATABASE_FILE_D}) $(dirname ${DATABASE_FILE_D})
@@ -201,7 +201,7 @@ case ${COMMAND} in
       #Add new data to the graph. Count in Kbs to deal with 16 bits signed values (up to 2G only)
       #Have to use temporary files because of crappy busybox shell
       echo "Updating stats for ${IP}"
-      
+
       # incoming traffic
       grep ${IP} /tmp/traffic_in_$$.tmp | while read PKTS BYTES TARGET PROT OPT IFIN IFOUT SRC DST
       do
@@ -237,30 +237,31 @@ case ${COMMAND} in
       OUT_EXTERNAL=$(cat /tmp/out_external_$$.tmp)
       rm -f /tmp/out_$$.tmp
       rm -f /tmp/out_external_$$.tmp
-      
+
       if [ ${IN} -gt 0 -o ${OUT} -gt 0 -o ${IN_EXTERNAL} -gt 0 -o ${OUT_EXTERNAL} -gt 0 ];  then
         echo "DEBUG : New traffic for ${MAC} since last update : internal ${IN}k:${OUT}k, external ${IN_EXTERNAL}k:${OUT_EXTERNAL}k"
-      
+
         update_db ${DATABASE_FILE_M} ${MAC} ${IN} ${OUT} ${IN_EXTERNAL} ${OUT_EXTERNAL}
         update_db ${DATABASE_FILE_D} ${MAC} ${IN} ${OUT} ${IN_EXTERNAL} ${OUT_EXTERNAL}
         update_db ${DATABASE_FILE_H} ${MAC} ${IN} ${OUT} ${IN_EXTERNAL} ${OUT_EXTERNAL}
       fi
     done
-    
+
     #Free some memory
     rm -f /tmp/*_$$.tmp
     unlock
     ;;
-    
+
   "publish_users" )
     USERS_OUTPUT="/www/user/data/users.html"
-    
+
     USERSFILE="/tmp/dnsmasq.leases"
     egrep -o "([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2} [^ ]+ [^ ]+" $USERSFILE | while read MAC IP NAME
     do
       MAC=$(echo $MAC | tr '[a-z]' '[A-Z]')
       grep -v "${MAC}" ${USERS_OUTPUT} > /tmp/users_$$.tmp
       mv /tmp/users_$$.tmp ${USERS_OUTPUT}
+      if [ "${NAME}" == "*" ]; then NAME="${MAC}"; fi
       echo ${MAC},${NAME} >> ${USERS_OUTPUT}
     done
 
@@ -271,13 +272,14 @@ case ${COMMAND} in
       MAC=$(echo $MAC | tr '[a-z]' '[A-Z]')
       grep -v "${MAC}" ${USERS_OUTPUT} > /tmp/users_$$.tmp
       mv /tmp/users_$$.tmp ${USERS_OUTPUT}
+      if [ "${NAME}" == "*" ]; then NAME="${MAC}"; fi
       echo ${MAC},${NAME} >> ${USERS_OUTPUT}
     done
-    
+
     cat $USERS_OUTPUT
 
     ;;
-    
+
   "download_scripts" )
     for FILE_PATH in $DOWNLOAD_FILE_LIST; do
       FILE_NAME=$(basename "$FILE_PATH")
