@@ -81,7 +81,7 @@ case ${1} in
 	#Read and reset counters
 	iptables -L RRDIPT -vnxZ -t filter > /tmp/traffic_$$.tmp
 
-	grep -v "0x0" /proc/net/arp  | while read IP TYPE FLAGS MAC MASK IFACE
+	egrep -v "0x0|^IP" /proc/net/arp  | while read IP TYPE FLAGS MAC MASK IFACE
 	do
 		#Add new data to the graph. Count in Kbs to deal with 16 bits signed values (up to 2G only)
 		#Have to use temporary files because of crappy busybox shell
@@ -90,12 +90,12 @@ case ${1} in
 			[ "${DST}" = "${IP}" ] && echo $((${BYTES}/1000)) > /tmp/in_$$.tmp
 			[ "${SRC}" = "${IP}" ] && echo $((${BYTES}/1000)) > /tmp/out_$$.tmp
 		done
-		IN=$(cat /tmp/in_$$.tmp)
-		OUT=$(cat /tmp/out_$$.tmp)
+		IN=$(cat /tmp/in_$$.tmp 2>/dev/null)
+		OUT=$(cat /tmp/out_$$.tmp 2>/dev/null)
 		rm -f /tmp/in_$$.tmp
 		rm -f /tmp/out_$$.tmp
 		
-		if [ ${IN} -gt 0 -o ${OUT} -gt 0 ];  then
+		if [ "${IN}" -gt 0 -o "${OUT}" -gt 0 ];  then
 			echo "DEBUG : New traffic for ${MAC} since last update : ${IN}k:${OUT}k"
 		
 			LINE=$(grep ${MAC} ${2})
