@@ -179,7 +179,7 @@ case ${1} in
 	for j in 1 2 3 4; do
             echo "document.write(\"<td>\");document.write(getSize(values[i][$j]));document.write(\"</td>\");" >> ${3}
 	done
-        echo "document.write(values[i][5]);document.write(\"</td>\");" >> ${3}
+        echo "document.write(\"<td>\");document.write(values[i][5]);document.write(\"</td>\");" >> ${3}
         echo "document.write(\"</tr>\");" >> ${3}
         echo "}</script></table>" >> ${3}
         echo "<br /><small>This page was generated on `date`</small>" 2>&1 >> ${3}
