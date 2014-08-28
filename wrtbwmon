@@ -21,7 +21,11 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-LAN_IFACE=$(nvram get lan_ifname)
+if [[ -n "`which uci`" ]]; then
+    LAN_IFACE=$(uci -P/var/state get network.lan.ifname)
+else
+    LAN_IFACE=$(nvram get lan_ifname)
+fi
 
 lock()
 {
