@@ -175,12 +175,11 @@ case ${1} in
         echo "0);" >> ${3}
 
         echo "for (i=0; i < values.length-1; i++) {document.write(\"<tr><td>\");" >> ${3}
-        echo "document.write(values[i][0]);document.write(\"</td><td>\");" >> ${3}
-        echo "document.write(getSize(values[i][1]));document.write(\"</td><td>\");" >> ${3}
-        echo "document.write(getSize(values[i][2]));document.write(\"</td><td>\");" >> ${3}
-        echo "document.write(getSize(values[i][3]));document.write(\"</td><td>\");" >> ${3}
-        echo "document.write(getSize(values[i][4]));document.write(\"</td><td>\");" >> ${3}
-        echo "document.write(values[i][5]);document.write(\"</td></tr>\");" >> ${3}
+        echo "document.write(values[i][0]);document.write(\"</td>\");" >> ${3}
+	for j in 1 2 3 4 5; do
+            echo "document.write(\"<td>\");document.write(getSize(values[i][$j]));document.write(\"</td>\");" >> ${3}
+	done
+        echo "document.write(\"</tr>\");" >> ${3}
         echo "}</script></table>" >> ${3}
         echo "<br /><small>This page was generated on `date`</small>" 2>&1 >> ${3}
         echo "</body></html>" >> ${3}
