@@ -94,6 +94,7 @@ case ${1} in
 			[ "${DST}" = "${IP}" ] && echo $((${BYTES}/1000)) > /tmp/in_$$.tmp
 			[ "${SRC}" = "${IP}" ] && echo $((${BYTES}/1000)) > /tmp/out_$$.tmp
 		done
+		[[ -f /tmp/in_$$.tmp ]] || [[ -f /tmp/out_$$.tmp ]] || continue
 		IN=$(cat /tmp/in_$$.tmp 2>/dev/null)
 		OUT=$(cat /tmp/out_$$.tmp 2>/dev/null)
 		rm -f /tmp/in_$$.tmp
