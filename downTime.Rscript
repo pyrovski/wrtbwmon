@@ -1,2 +1,12 @@
 #!/usr/bin/env Rscript
-system("grep Unre ping.log | egrep -o '\\[.*\\]'| tr -d '[]' > times");a = read.table('times', h=F)$V1;as.numeric(system('date +%s', intern=T))-max(a)
+cur_time = as.numeric(format(Sys.time(), "%s"))
+system("grep Unre ping.log | egrep -o '\\[.*\\]'| tr -d '[]' > fail_times")
+fail = read.table('fail_times', h=F)$V1
+#system("egrep '^\\[.*ms' ping.log | cut -d' ' -f1,8 | tr -d '[]time=' > success_times")
+system("egrep -v '^#|^PING|Unre' ping.log | cut -d' ' -f1,8 | tr -d '[]time=' > success_times")
+success = read.table('success_times', h=F)
+last_time = tail(success$V1, 1)
+since_last = cur_time - last_time
+cat('time since last event:', since_last, 's\n')
+seconds = cur_time-max(fail)
+cat('time since last upstream outage:', seconds/60/60, 'hours\n')
