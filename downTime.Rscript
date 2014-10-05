@@ -1,0 +1,2 @@
+#!/usr/bin/env Rscript
+system("grep Unre ping.log | egrep -o '\\[.*\\]'| tr -d '[]' > times");a = read.table('times', h=F)$V1;as.numeric(system('date +%s', intern=T))-max(a)
