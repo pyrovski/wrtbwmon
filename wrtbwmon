@@ -70,7 +70,12 @@ case ${1} in
 						     iptables -I RRDIPT_$chain -s ${IP} -j RETURN
 						 fi
 					     done
-	done
+	    if [ "$chain" = "OUTPUT" ]; then
+		iptables -A RRDIPT_$chain -o tun0 -j RETURN
+	    elif [ "$chain" = "INPUT" ]; then
+		iptables -A RRDIPT_$chain -i tun0 -j RETURN
+	    fi
+	done # for all chains
 
 	;;
     
