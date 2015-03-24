@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #
 # Traffic logging tool for OpenWRT-based routers
 #
@@ -21,60 +21,60 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-if [[ -n "`which uci`" ]]; then
-    LAN_IFACE=$(uci -P/var/state get network.lan.ifname)
-else
-    LAN_IFACE=$(nvram get lan_ifname)
-fi
+set -x
+echo $PATH
+
+chains='INPUT OUTPUT FORWARD'
 
 lock()
 {
-	while [ -f /tmp/wrtbwmon.lock ]; do
-		if [ ! -d /proc/$(cat /tmp/wrtbwmon.lock) ]; then
-			echo "WARNING : Lockfile detected but process $(cat /tmp/wrtbwmon.lock) does not exist !"
-			rm -f /tmp/wrtbwmon.lock
-		fi
-		sleep 1
-	done
-	echo $$ > /tmp/wrtbwmon.lock
+    while [ -f /tmp/wrtbwmon.lock ]; do
+	if [ ! -d /proc/$(cat /tmp/wrtbwmon.lock) ]; then
+	    echo "WARNING : Lockfile detected but process $(cat /tmp/wrtbwmon.lock) does not exist !"
+	    rm -f /tmp/wrtbwmon.lock
+	fi
+	sleep 1
+    done
+    echo $$ > /tmp/wrtbwmon.lock
 }
 
 unlock()
 {
-	rm -f /tmp/wrtbwmon.lock
+    rm -f /tmp/wrtbwmon.lock
 }
 
 case ${1} in
 
-"setup" )
+    "setup" )
+	for chain in $chains; do
+	    #Create the RRDIPT_$chain chain (it doesn't matter if it already exists).
+	    iptables -N RRDIPT_$chain 2> /dev/null
 
-	#Create the RRDIPT CHAIN (it doesn't matter if it already exists).
-	iptables -N RRDIPT 2> /dev/null
-
-	#Add the RRDIPT CHAIN to the FORWARD chain (if non existing).
-	iptables -L FORWARD --line-numbers -n | grep "RRDIPT" | grep "1" > /dev/null
-	if [ $? -ne 0 ]; then
-		iptables -L FORWARD -n | grep "RRDIPT" > /dev/null
+	    #Add the RRDIPT_$chain CHAIN to the $chain chain (if non existing).
+	    iptables -L $chain --line-numbers -n | grep "RRDIPT_$chain" | grep "1" > /dev/null
+	    if [ $? -ne 0 ]; then
+		iptables -L $chain -n | grep "RRDIPT_$chain" > /dev/null
 		if [ $? -eq 0 ]; then
-			echo "DEBUG : iptables chain misplaced, recreating it..."
-			iptables -D FORWARD -j RRDIPT
+		    echo "DEBUG : iptables chain misplaced, recreating it..."
+		    iptables -D $chain -j RRDIPT_$chain
 		fi
-		iptables -I FORWARD -j RRDIPT
-	fi
+		iptables -I $chain -j RRDIPT_$chain
+	    fi
+	    #For each host in the ARP table
+            cat /proc/net/arp | tail -n +2 | while read IP TYPE FLAGS MAC MASK IFACE
+					     do
+						 #Add iptable rules (if non existing).
+						 iptables -nL RRDIPT_$chain | grep "${IP} " > /dev/null
+						 if [ $? -ne 0 ]; then
+						     iptables -I RRDIPT_$chain -d ${IP} -j RETURN
+						     iptables -I RRDIPT_$chain -s ${IP} -j RETURN
+						 fi
+					     done
+	done
 
-	#For each host in the ARP table
-	grep ${LAN_IFACE} /proc/net/arp | while read IP TYPE FLAGS MAC MASK IFACE
-	do
-		#Add iptable rules (if non existing).
-		iptables -nL RRDIPT | grep "${IP} " > /dev/null
-		if [ $? -ne 0 ]; then
-			iptables -I RRDIPT -d ${IP} -j RETURN
-			iptables -I RRDIPT -s ${IP} -j RETURN
-		fi
-	done	
 	;;
-	
-"update" )
+    
+    "update" )
 	[ -z "${2}" ] && echo "ERROR : Missing argument 2" && exit 1
 	
 	# Uncomment this line if you want to abort if database not found
@@ -83,60 +83,60 @@ case ${1} in
 	lock
 
 	#Read and reset counters
-	iptables -L RRDIPT -vnxZ -t filter > /tmp/traffic_$$.tmp
+	iptables -L RRDIPT_OUT -vnxZ -t filter > /tmp/traffic_$$.tmp
 
 	egrep -v "0x0|^IP" /proc/net/arp  | while read IP TYPE FLAGS MAC MASK IFACE
-	do
-		#Add new data to the graph. Count in Kbs to deal with 16 bits signed values (up to 2G only)
-		#Have to use temporary files because of crappy busybox shell
-		grep ${IP} /tmp/traffic_$$.tmp | while read PKTS BYTES TARGET PROT OPT IFIN IFOUT SRC DST
-		do
-			[ "${DST}" = "${IP}" ] && echo $((${BYTES}/1000)) > /tmp/in_$$.tmp
-			[ "${SRC}" = "${IP}" ] && echo $((${BYTES}/1000)) > /tmp/out_$$.tmp
-		done
-		[[ -f /tmp/in_$$.tmp ]] || [[ -f /tmp/out_$$.tmp ]] || continue
-		IN=$(cat /tmp/in_$$.tmp 2>/dev/null)
-		OUT=$(cat /tmp/out_$$.tmp 2>/dev/null)
-		rm -f /tmp/in_$$.tmp
-		rm -f /tmp/out_$$.tmp
-		
-		if [ "${IN}" -gt 0 -o "${OUT}" -gt 0 ];  then
-			echo "DEBUG : New traffic for ${MAC} since last update : ${IN}k:${OUT}k"
-		
-			LINE=$(grep ${MAC} ${2})
-			if [ -z "${LINE}" ]; then
-				echo "DEBUG : ${MAC} is a new host !"
-				PEAKUSAGE_IN=0
-				PEAKUSAGE_OUT=0
-				OFFPEAKUSAGE_IN=0
-				OFFPEAKUSAGE_OUT=0
-			else
-				PEAKUSAGE_IN=$(echo ${LINE} | cut -f2 -s -d, )
-				PEAKUSAGE_OUT=$(echo ${LINE} | cut -f3 -s -d, )
-				OFFPEAKUSAGE_IN=$(echo ${LINE} | cut -f4 -s -d, )
-				OFFPEAKUSAGE_OUT=$(echo ${LINE} | cut -f5 -s -d, )
-			fi
-			
-			if [ "${3}" = "offpeak" ]; then
-				OFFPEAKUSAGE_IN=$((${OFFPEAKUSAGE_IN}+${IN}))
-				OFFPEAKUSAGE_OUT=$((${OFFPEAKUSAGE_OUT}+${OUT}))
-			else
-				PEAKUSAGE_IN=$((${PEAKUSAGE_IN}+${IN}))
-				PEAKUSAGE_OUT=$((${PEAKUSAGE_OUT}+${OUT}))
-			fi
+					    do
+						#Add new data to the graph. Count in Kbs to deal with 16 bits signed values (up to 2G only)
+						#Have to use temporary files because of crappy busybox shell
+						grep ${IP} /tmp/traffic_$$.tmp | while read PKTS BYTES TARGET PROT OPT IFIN IFOUT SRC DST
+										 do
+										     [ "${DST}" = "${IP}" ] && echo $((${BYTES}/1000)) > /tmp/in_$$.tmp
+										     [ "${SRC}" = "${IP}" ] && echo $((${BYTES}/1000)) > /tmp/out_$$.tmp
+										 done
+						[[ -f /tmp/in_$$.tmp ]] || [[ -f /tmp/out_$$.tmp ]] || continue
+						IN=$(cat /tmp/in_$$.tmp 2>/dev/null)
+						OUT=$(cat /tmp/out_$$.tmp 2>/dev/null)
+						rm -f /tmp/in_$$.tmp
+						rm -f /tmp/out_$$.tmp
+						
+						if [ "${IN}" -gt 0 -o "${OUT}" -gt 0 ];  then
+						    echo "DEBUG : New traffic for ${MAC} since last update : ${IN}k:${OUT}k"
+						    
+						    LINE=$(grep ${MAC} ${2})
+						    if [ -z "${LINE}" ]; then
+							echo "DEBUG : ${MAC} is a new host !"
+							PEAKUSAGE_IN=0
+							PEAKUSAGE_OUT=0
+							OFFPEAKUSAGE_IN=0
+							OFFPEAKUSAGE_OUT=0
+						    else
+							PEAKUSAGE_IN=$(echo ${LINE} | cut -f2 -s -d, )
+							PEAKUSAGE_OUT=$(echo ${LINE} | cut -f3 -s -d, )
+							OFFPEAKUSAGE_IN=$(echo ${LINE} | cut -f4 -s -d, )
+							OFFPEAKUSAGE_OUT=$(echo ${LINE} | cut -f5 -s -d, )
+						    fi
+						    
+						    if [ "${3}" = "offpeak" ]; then
+							OFFPEAKUSAGE_IN=$((${OFFPEAKUSAGE_IN}+${IN}))
+							OFFPEAKUSAGE_OUT=$((${OFFPEAKUSAGE_OUT}+${OUT}))
+						    else
+							PEAKUSAGE_IN=$((${PEAKUSAGE_IN}+${IN}))
+							PEAKUSAGE_OUT=$((${PEAKUSAGE_OUT}+${OUT}))
+						    fi
 
-			grep -v "${MAC}" ${2} > /tmp/db_$$.tmp
-			mv /tmp/db_$$.tmp ${2}
-			echo ${MAC},${PEAKUSAGE_IN},${PEAKUSAGE_OUT},${OFFPEAKUSAGE_IN},${OFFPEAKUSAGE_OUT},$(date "+%d-%m-%Y %H:%M") >> ${2}
-		fi
-	done
+						    grep -v "${MAC}" ${2} > /tmp/db_$$.tmp
+						    mv /tmp/db_$$.tmp ${2}
+						    echo ${MAC},${PEAKUSAGE_IN},${PEAKUSAGE_OUT},${OFFPEAKUSAGE_IN},${OFFPEAKUSAGE_OUT},$(date "+%d-%m-%Y %H:%M") >> ${2}
+						fi
+					    done
 	
 	#Free some memory
 	rm -f /tmp/*_$$.tmp
 	unlock
 	;;
-	
-"publish" )
+    
+    "publish" )
 
 	[ -z "${2}" ] && echo "ERROR : Missing argument 2" && exit 1
 	[ -z "${3}" ] && echo "ERROR : Missing argument 3" && exit 1
@@ -150,9 +150,9 @@ case ${1} in
 	lock
 	touch /tmp/sorted_$$.tmp
 	cat ${2} | while IFS=, read MAC PEAKUSAGE_IN PEAKUSAGE_OUT OFFPEAKUSAGE_IN OFFPEAKUSAGE_OUT LASTSEEN
-	do
-		echo ${PEAKUSAGE_IN},${PEAKUSAGE_OUT},${OFFPEAKUSAGE_IN},${OFFPEAKUSAGE_OUT},${MAC},${LASTSEEN} >> /tmp/sorted_$$.tmp
-	done
+		   do
+		       echo ${PEAKUSAGE_IN},${PEAKUSAGE_OUT},${OFFPEAKUSAGE_IN},${OFFPEAKUSAGE_OUT},${MAC},${LASTSEEN} >> /tmp/sorted_$$.tmp
+		   done
 	unlock
 
         # create HTML page
@@ -167,12 +167,12 @@ case ${1} in
 
         echo "var values = new Array(" >> ${3}
         sort -n /tmp/sorted_$$.tmp | while IFS=, read PEAKUSAGE_IN PEAKUSAGE_OUT OFFPEAKUSAGE_IN OFFPEAKUSAGE_OUT MAC LASTSEEN
-        do
-                echo "new Array(" >> ${3}
-                USER=$(grep "${MAC}" "${USERSFILE}" | cut -f2 -s -d, )
-                [ -z "$USER" ] && USER=${MAC}
-                echo "\"${USER}\",${PEAKUSAGE_IN}000,${PEAKUSAGE_OUT}000,${OFFPEAKUSAGE_IN}000,${OFFPEAKUSAGE_OUT}000,\"${LASTSEEN}\")," >> ${3}
-        done
+				     do
+					 echo "new Array(" >> ${3}
+					 USER=$(grep "${MAC}" "${USERSFILE}" | cut -f2 -s -d, )
+					 [ -z "$USER" ] && USER=${MAC}
+					 echo "\"${USER}\",${PEAKUSAGE_IN}000,${PEAKUSAGE_OUT}000,${OFFPEAKUSAGE_IN}000,${OFFPEAKUSAGE_OUT}000,\"${LASTSEEN}\")," >> ${3}
+				     done
         echo "0);" >> ${3}
 
         echo "for (i=0; i < values.length-1; i++) {document.write(\"<tr><td>\");" >> ${3}
@@ -190,8 +190,21 @@ case ${1} in
         rm -f /tmp/*_$$.tmp
         ;;
 
-*)
-	echo "Usage : $0 {setup|update|publish} [options...]"
+    "remove" )
+	for chain in $chains; do
+	    iptables -D $chain -j RRDIPT_$chain 2> /dev/null
+	    true
+	    a=$?
+	    while [[ $a -eq 0 ]]; do
+		iptables -D RRDIPT_$chain 1 2> /dev/null
+		a=$?
+	    done
+	    iptables -X RRDIPT_$chain 2> /dev/null
+	done
+	;;
+    
+    *)
+	echo "Usage : $0 {setup|update|publish|remove} [options...]"
 	echo "Options : "
 	echo "   $0 setup"
 	echo "   $0 update database_file [offpeak]"
@@ -200,6 +213,7 @@ case ${1} in
 	echo "   $0 setup"
 	echo "   $0 update /tmp/usage.db offpeak"
 	echo "   $0 publish /tmp/usage.db /www/user/usage.htm /jffs/users.txt"
+	echo "   $0 remove"
 	echo "Note : [user_file] is an optional file to match users with their MAC address"
 	echo "       Its format is : 00:MA:CA:DD:RE:SS,username , with one entry per line"
 	exit
