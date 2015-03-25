@@ -107,7 +107,8 @@ case $1 in
 
 	#Read and reset counters
 	for chain in $chains; do
-	    iptables -L RRDIPT_$chain -vnxZ > /tmp/traffic_${chain}_$$.tmp
+            table=$(egrep "^$chain " /tmp/tables | cut -d' ' -f2)
+	    iptables -t $table -L RRDIPT_$chain -vnxZ > /tmp/traffic_${chain}_$$.tmp
 	done
 
 	#!@todo read tun data
