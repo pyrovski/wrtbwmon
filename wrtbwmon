@@ -23,9 +23,17 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 #set -x
+
+trap "unlock; exit 1" SIGINT
+
 chains='INPUT OUTPUT FORWARD'
 DEBUG=
 tun=tun0
+
+dateFormat()
+{
+    date "+%d-%m-%Y %H:%M:%S"
+}
 
 lock()
 {
@@ -140,6 +148,10 @@ case $1 in
 			PEAKUSAGE_OUT=0
 			OFFPEAKUSAGE_IN=0
 			OFFPEAKUSAGE_OUT=0
+
+			#!@todo store in table
+			firstDate=$(dateFormat)
+			
 			#!@todo get hostname with: nslookup $IP | grep "$IP " | cut -d' ' -f4
 		    else
 			echo $LINE | cut -s -d, -f4-7 | tr ',' ' ' > "/tmp/${MAC}_$$.tmp"
@@ -163,7 +175,7 @@ case $1 in
 		    grep -v "${MAC}" $2 > /tmp/db_$$.tmp
 		    mv /tmp/db_$$.tmp $2
 
-		    echo ${MAC},${IP},${IFACE},${PEAKUSAGE_IN},${PEAKUSAGE_OUT},${OFFPEAKUSAGE_IN},${OFFPEAKUSAGE_OUT},$(date "+%d-%m-%Y %H:%M:%S") >> $2
+		    echo ${MAC},${IP},${IFACE},${PEAKUSAGE_IN},${PEAKUSAGE_OUT},${OFFPEAKUSAGE_IN},${OFFPEAKUSAGE_OUT},$(dateFormat) >> $2
 		fi
 	    done
 
