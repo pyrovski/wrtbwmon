@@ -21,16 +21,16 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-set -x
-echo $PATH
-
+#set -x
 chains='INPUT OUTPUT FORWARD'
+DEBUG=
+tun=tun0
 
 lock()
 {
     while [ -f /tmp/wrtbwmon.lock ]; do
 	if [ ! -d /proc/$(cat /tmp/wrtbwmon.lock) ]; then
-	    echo "WARNING : Lockfile detected but process $(cat /tmp/wrtbwmon.lock) does not exist !"
+	    echo "WARNING: Lockfile detected but process $(cat /tmp/wrtbwmon.lock) does not exist !"
 	    rm -f /tmp/wrtbwmon.lock
 	fi
 	sleep 1
@@ -43,7 +43,7 @@ unlock()
     rm -f /tmp/wrtbwmon.lock
 }
 
-case ${1} in
+case $1 in
 
     "setup" )
 	for chain in $chains; do
@@ -51,11 +51,11 @@ case ${1} in
 	    iptables -N RRDIPT_$chain 2> /dev/null
 
 	    #Add the RRDIPT_$chain CHAIN to the $chain chain (if non existing).
-	    iptables -L $chain --line-numbers -n | grep "RRDIPT_$chain" | grep "1" > /dev/null
+	    iptables -L $chain --line-numbers -n | grep "RRDIPT_$chain" > /dev/null
 	    if [ $? -ne 0 ]; then
 		iptables -L $chain -n | grep "RRDIPT_$chain" > /dev/null
 		if [ $? -eq 0 ]; then
-		    echo "DEBUG : iptables chain misplaced, recreating it..."
+		    [ -n "$DEBUG" ] && echo "DEBUG: iptables chain misplaced, recreating it..."
 		    iptables -D $chain -j RRDIPT_$chain
 		fi
 		iptables -I $chain -j RRDIPT_$chain
@@ -78,74 +78,81 @@ case ${1} in
 
 	    #!@todo automate this;
 	    # can detect gateway IPs: route -n | grep '^[0-9]' | awk '{print $2}' | sort | uniq | grep -v 0.0.0.0
-	    if [ "$chain" = "OUTPUT" ]; then
-		iptables -A RRDIPT_$chain -o tun0 -j RETURN
-	    elif [ "$chain" = "INPUT" ]; then
-		iptables -A RRDIPT_$chain -i tun0 -j RETURN
+	    if [ -n "$tun" ]; then
+		if [ "$chain" = "OUTPUT" ]; then
+		    iptables -A RRDIPT_$chain -o $tun -j RETURN
+		elif [ "$chain" = "INPUT" ]; then
+		    iptables -A RRDIPT_$chain -i $tun -j RETURN
+		fi
 	    fi
 	done # for all chains
-
+	
 	;;
     
     "update" )
-	[ -z "${2}" ] && echo "ERROR : Missing argument 2" && exit 1
-	
-	# Uncomment this line if you want to abort if database not found
-	# [ -f "${2}" ] || exit 1
+	[ -z "$2" ] && echo "ERROR: Missing argument 2" && exit 1	
+	[ ! -f "$2" ] && touch "$2"
+	[ ! -w "$2" ] && echo "ERROR: $2 not writable" && exit 1
 
 	lock
 
 	#Read and reset counters
-	iptables -L RRDIPT_OUT -vnxZ -t filter > /tmp/traffic_$$.tmp
+	for chain in $chains; do
+	    iptables -L RRDIPT_$chain -vnxZ > /tmp/traffic_${chain}_$$.tmp
+	done
 
 	egrep -v "0x0|^IP" /proc/net/arp  | \
 	    while read IP TYPE FLAGS MAC MASK IFACE
 	    do
-		#Add new data to the graph. Count in Kbs to deal with 16 bits signed values (up to 2G only)
-		#Have to use temporary files because of crappy busybox shell
-		grep ${IP} /tmp/traffic_$$.tmp | \
+		IN=0
+		OUT=0
+		#Add new data to the graph.
+		for chain in $chains; do
+		    grep ${IP} /tmp/traffic_${chain}_$$.tmp > /tmp/${IP}_${chain}_$$.tmp
 		    while read PKTS BYTES TARGET PROT OPT IFIN IFOUT SRC DST
 		    do
-			[ "${DST}" = "${IP}" ] && echo $((${BYTES}/1000)) > /tmp/in_$$.tmp
-			[ "${SRC}" = "${IP}" ] && echo $((${BYTES}/1000)) > /tmp/out_$$.tmp
-		    done
-		[[ -f /tmp/in_$$.tmp ]] || [[ -f /tmp/out_$$.tmp ]] || continue
-		IN=$(cat /tmp/in_$$.tmp 2>/dev/null)
-		OUT=$(cat /tmp/out_$$.tmp 2>/dev/null)
-		rm -f /tmp/in_$$.tmp
-		rm -f /tmp/out_$$.tmp
+			[ "$chain" = "OUTPUT" -o "$chain" = "FORWARD" ] && [ "${DST}" = "${IP}" ] && IN=$((IN + BYTES))
+			[ "$chain" = "INPUT" -o "$chain" = "FORWARD" ] && [ "${SRC}" = "${IP}" ] && OUT=$((OUT + BYTES))
+		    done < /tmp/${IP}_${chain}_$$.tmp
+		    rm -f /tmp/${IP}_${chain}_$$.tmp
+		done
+		[[ $IN -gt 0 ]] || [[ $OUT -gt 0 ]] || continue
 		
 		if [ "${IN}" -gt 0 -o "${OUT}" -gt 0 ];  then
-		    echo "DEBUG : New traffic for ${MAC} since last update : ${IN}k:${OUT}k"
+		    [ -n "$DEBUG" ] && echo "DEBUG: New traffic for ${MAC} since last update: ${IN}:${OUT}"
 		    
-		    LINE=$(grep ${MAC} ${2})
+		    LINE=$(grep ${MAC} $2)
 		    if [ -z "${LINE}" ]; then
-			echo "DEBUG : ${MAC} is a new host !"
+			[ -n "$DEBUG" ] && echo "DEBUG: ${MAC} is a new host !"
 			PEAKUSAGE_IN=0
 			PEAKUSAGE_OUT=0
 			OFFPEAKUSAGE_IN=0
 			OFFPEAKUSAGE_OUT=0
 		    else
-			PEAKUSAGE_IN=$(echo ${LINE} | cut -f2 -s -d, )
-			PEAKUSAGE_OUT=$(echo ${LINE} | cut -f3 -s -d, )
-			OFFPEAKUSAGE_IN=$(echo ${LINE} | cut -f4 -s -d, )
-			OFFPEAKUSAGE_OUT=$(echo ${LINE} | cut -f5 -s -d, )
+			echo $LINE | cut -s -d, -f2- > "/tmp/${MAC}_$$.tmp"
+			read PEAKUSAGE_IN PEAKUSAGE_OUT OFFPEAKUSAGE_IN OFFPEAKUSAGE_OUT < "/tmp/${MAC}_$$.tmp"
 		    fi
 		    
 		    if [ "${3}" = "offpeak" ]; then
+			echo $LINE | cut -f4,5 -s -d, > "/tmp/${MAC}_$$.tmp"
+			read OFFPEAKUSAGE_IN OFFPEAKUSAGE_OUT < "/tmp/${MAC}_$$.tmp"
 			OFFPEAKUSAGE_IN=$((${OFFPEAKUSAGE_IN}+${IN}))
 			OFFPEAKUSAGE_OUT=$((${OFFPEAKUSAGE_OUT}+${OUT}))
 		    else
+			echo $LINE | cut -f2,3 -s -d, > "/tmp/${MAC}_$$.tmp"
+			read PEAKUSAGE_IN PEAKUSAGE_OUT < "/tmp/${MAC}_$$.tmp"
 			PEAKUSAGE_IN=$((${PEAKUSAGE_IN}+${IN}))
 			PEAKUSAGE_OUT=$((${PEAKUSAGE_OUT}+${OUT}))
 		    fi
+
+		    rm -f "/tmp/${MAC}_$$.tmp"
 		    
-		    grep -v "${MAC}" ${2} > /tmp/db_$$.tmp
-		    mv /tmp/db_$$.tmp ${2}
-		    echo ${MAC},${PEAKUSAGE_IN},${PEAKUSAGE_OUT},${OFFPEAKUSAGE_IN},${OFFPEAKUSAGE_OUT},$(date "+%d-%m-%Y %H:%M") >> ${2}
+		    grep -v "${MAC}" $2 > /tmp/db_$$.tmp
+		    mv /tmp/db_$$.tmp $2
+		    echo ${MAC},${PEAKUSAGE_IN},${PEAKUSAGE_OUT},${OFFPEAKUSAGE_IN},${OFFPEAKUSAGE_OUT},$(date "+%d-%m-%Y %H:%M:%S") >> $2
 		fi
 	    done
-	
+
 	#Free some memory
 	rm -f /tmp/*_$$.tmp
 	unlock
@@ -153,18 +160,18 @@ case ${1} in
     
     "publish" )
 
-	[ -z "${2}" ] && echo "ERROR : Missing argument 2" && exit 1
-	[ -z "${3}" ] && echo "ERROR : Missing argument 3" && exit 1
+	[ -z "$2" ] && echo "ERROR: Missing argument 2" && exit 1
+	[ -z "$3" ] && echo "ERROR: Missing argument 3" && exit 1
 	
 	USERSFILE="/etc/dnsmasq.conf"
-	[ -f "${USERSFILE}" ] || USERSFILE="/tmp/dnsmasq.conf"
-	[ -z "${4}" ] || USERSFILE=${4}
-	[ -f "${USERSFILE}" ] || USERSFILE="/dev/null"
+	[ -f "$USERSFILE" ] || USERSFILE="/tmp/dnsmasq.conf"
+	[ -z "$4" ] || USERSFILE=${4}
+	[ -f "$USERSFILE" ] || USERSFILE="/dev/null"
 
 	# first do some number crunching - rewrite the database so that it is sorted
 	lock
 	touch /tmp/sorted_$$.tmp
-	cat ${2} | while IFS=, read MAC PEAKUSAGE_IN PEAKUSAGE_OUT OFFPEAKUSAGE_IN OFFPEAKUSAGE_OUT LASTSEEN
+	cat $2 | while IFS=, read MAC PEAKUSAGE_IN PEAKUSAGE_OUT OFFPEAKUSAGE_IN OFFPEAKUSAGE_OUT LASTSEEN
 		   do
 		       echo ${PEAKUSAGE_IN},${PEAKUSAGE_OUT},${OFFPEAKUSAGE_IN},${OFFPEAKUSAGE_OUT},${MAC},${LASTSEEN} >> /tmp/sorted_$$.tmp
 		   done
@@ -219,18 +226,18 @@ case ${1} in
 	;;
     
     *)
-	echo "Usage : $0 {setup|update|publish|remove} [options...]"
-	echo "Options : "
+	echo "Usage: $0 {setup|update|publish|remove} [options...]"
+	echo "Options: "
 	echo "   $0 setup"
 	echo "   $0 update database_file [offpeak]"
 	echo "   $0 publish database_file path_of_html_report [user_file]"
-	echo "Examples : "
+	echo "Examples: "
 	echo "   $0 setup"
 	echo "   $0 update /tmp/usage.db offpeak"
 	echo "   $0 publish /tmp/usage.db /www/user/usage.htm /jffs/users.txt"
 	echo "   $0 remove"
-	echo "Note : [user_file] is an optional file to match users with their MAC address"
-	echo "       Its format is : 00:MA:CA:DD:RE:SS,username , with one entry per line"
+	echo "Note: [user_file] is an optional file to match users with their MAC address"
+	echo "       Its format is: 00:MA:CA:DD:RE:SS,username , with one entry per line"
 	exit
 	;;
 esac
