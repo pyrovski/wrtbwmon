@@ -43,6 +43,8 @@ unlock()
     rm -f /tmp/wrtbwmon.lock
 }
 
+#!@todo track interfaces and IP addresses in table
+
 case $1 in
 
     "setup" )
@@ -101,7 +103,7 @@ case $1 in
 	    iptables -L RRDIPT_$chain -vnxZ > /tmp/traffic_${chain}_$$.tmp
 	done
 
-	egrep -v "0x0|^IP" /proc/net/arp  | \
+        tail -n +2 /proc/net/arp  | \
 	    while read IP TYPE FLAGS MAC MASK IFACE
 	    do
 		IN=0
@@ -132,7 +134,6 @@ case $1 in
 			echo $LINE | cut -s -d, -f2-5 | tr ',' ' ' > "/tmp/${MAC}_$$.tmp"
 			read PEAKUSAGE_IN PEAKUSAGE_OUT OFFPEAKUSAGE_IN OFFPEAKUSAGE_OUT < "/tmp/${MAC}_$$.tmp"
 		    fi
-		    echo $PEAKUSAGE_IN $PEAKUSAGE_OUT $OFFPEAKUSAGE_IN $OFFPEAKUSAGE_OUT
 		    
 		    if [ "${3}" = "offpeak" ]; then
 			echo $LINE | cut -f4,5 -s -d, | tr ',' ' ' > "/tmp/${MAC}_$$.tmp"
