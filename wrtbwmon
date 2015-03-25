@@ -3,6 +3,7 @@
 # Traffic logging tool for OpenWRT-based routers
 #
 # Created by Emmanuel Brucy (e.brucy AT qut.edu.au)
+# Updated by Peter Bailey (peter.eldridge.bailey@gmail.com)
 #
 # Based on work from Fredrik Erlandsson (erlis AT linux.nu)
 # Based on traff_graph script by twist - http://wiki.openwrt.org/RrdTrafficWatch
@@ -109,6 +110,8 @@ case $1 in
 	    iptables -L RRDIPT_$chain -vnxZ > /tmp/traffic_${chain}_$$.tmp
 	done
 
+	#!@todo read tun data
+	
         tail -n +2 /proc/net/arp  | \
 	    while read IP TYPE FLAGS MAC MASK IFACE
 	    do
@@ -136,18 +139,19 @@ case $1 in
 			PEAKUSAGE_OUT=0
 			OFFPEAKUSAGE_IN=0
 			OFFPEAKUSAGE_OUT=0
+			#!@todo get hostname with: nslookup $IP | grep "$IP " | cut -d' ' -f4
 		    else
-			echo $LINE | cut -s -d, -f2-5 | tr ',' ' ' > "/tmp/${MAC}_$$.tmp"
+			echo $LINE | cut -s -d, -f4-7 | tr ',' ' ' > "/tmp/${MAC}_$$.tmp"
 			read PEAKUSAGE_IN PEAKUSAGE_OUT OFFPEAKUSAGE_IN OFFPEAKUSAGE_OUT < "/tmp/${MAC}_$$.tmp"
 		    fi
 		    
 		    if [ "${3}" = "offpeak" ]; then
-			echo $LINE | cut -f4,5 -s -d, | tr ',' ' ' > "/tmp/${MAC}_$$.tmp"
+			echo $LINE | cut -f6,7 -s -d, | tr ',' ' ' > "/tmp/${MAC}_$$.tmp"
 			read OFFPEAKUSAGE_IN OFFPEAKUSAGE_OUT < "/tmp/${MAC}_$$.tmp"
 			OFFPEAKUSAGE_IN=$((OFFPEAKUSAGE_IN + IN))
 			OFFPEAKUSAGE_OUT=$((OFFPEAKUSAGE_OUT + OUT))
 		    else
-			echo $LINE | cut -f2,3 -s -d, | tr ',' ' ' > "/tmp/${MAC}_$$.tmp"
+			echo $LINE | cut -f4,5 -s -d, | tr ',' ' ' > "/tmp/${MAC}_$$.tmp"
 			read PEAKUSAGE_IN PEAKUSAGE_OUT < "/tmp/${MAC}_$$.tmp"
 			PEAKUSAGE_IN=$((PEAKUSAGE_IN + IN))
 			PEAKUSAGE_OUT=$((PEAKUSAGE_OUT + OUT))
@@ -157,7 +161,8 @@ case $1 in
 		    
 		    grep -v "${MAC}" $2 > /tmp/db_$$.tmp
 		    mv /tmp/db_$$.tmp $2
-		    echo ${MAC},${PEAKUSAGE_IN},${PEAKUSAGE_OUT},${OFFPEAKUSAGE_IN},${OFFPEAKUSAGE_OUT},$(date "+%d-%m-%Y %H:%M:%S") >> $2
+
+		    echo ${MAC},${IP},${IFACE},${PEAKUSAGE_IN},${PEAKUSAGE_OUT},${OFFPEAKUSAGE_IN},${OFFPEAKUSAGE_OUT},$(date "+%d-%m-%Y %H:%M:%S") >> $2
 		fi
 	    done
 
