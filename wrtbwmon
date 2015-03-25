@@ -61,15 +61,19 @@ case ${1} in
 		iptables -I $chain -j RRDIPT_$chain
 	    fi
 	    #For each host in the ARP table
-            cat /proc/net/arp | tail -n +2 | while read IP TYPE FLAGS MAC MASK IFACE
-					     do
-						 #Add iptable rules (if non existing).
-						 iptables -nL RRDIPT_$chain | grep "${IP} " > /dev/null
-						 if [ $? -ne 0 ]; then
-						     iptables -I RRDIPT_$chain -d ${IP} -j RETURN
-						     iptables -I RRDIPT_$chain -s ${IP} -j RETURN
-						 fi
-					     done
+            cat /proc/net/arp | tail -n +2 | \
+		while read IP TYPE FLAGS MAC MASK IFACE
+		do
+		    #Add iptable rules (if non existing).
+		    iptables -nL RRDIPT_$chain | grep "${IP} " > /dev/null
+		    if [ $? -ne 0 ]; then
+			iptables -I RRDIPT_$chain -d ${IP} -j RETURN
+			iptables -I RRDIPT_$chain -s ${IP} -j RETURN
+		    fi
+		done
+
+	    #!@todo automate this;
+	    # can detect gateway IPs: route -n | grep '^[0-9]' | awk '{print $2}' | sort | uniq | grep -v 0.0.0.0
 	    if [ "$chain" = "OUTPUT" ]; then
 		iptables -A RRDIPT_$chain -o tun0 -j RETURN
 	    elif [ "$chain" = "INPUT" ]; then
@@ -90,51 +94,53 @@ case ${1} in
 	#Read and reset counters
 	iptables -L RRDIPT_OUT -vnxZ -t filter > /tmp/traffic_$$.tmp
 
-	egrep -v "0x0|^IP" /proc/net/arp  | while read IP TYPE FLAGS MAC MASK IFACE
-					    do
-						#Add new data to the graph. Count in Kbs to deal with 16 bits signed values (up to 2G only)
-						#Have to use temporary files because of crappy busybox shell
-						grep ${IP} /tmp/traffic_$$.tmp | while read PKTS BYTES TARGET PROT OPT IFIN IFOUT SRC DST
-										 do
-										     [ "${DST}" = "${IP}" ] && echo $((${BYTES}/1000)) > /tmp/in_$$.tmp
-										     [ "${SRC}" = "${IP}" ] && echo $((${BYTES}/1000)) > /tmp/out_$$.tmp
-										 done
-						[[ -f /tmp/in_$$.tmp ]] || [[ -f /tmp/out_$$.tmp ]] || continue
-						IN=$(cat /tmp/in_$$.tmp 2>/dev/null)
-						OUT=$(cat /tmp/out_$$.tmp 2>/dev/null)
-						rm -f /tmp/in_$$.tmp
-						rm -f /tmp/out_$$.tmp
-						
-						if [ "${IN}" -gt 0 -o "${OUT}" -gt 0 ];  then
-						    echo "DEBUG : New traffic for ${MAC} since last update : ${IN}k:${OUT}k"
-						    
-						    LINE=$(grep ${MAC} ${2})
-						    if [ -z "${LINE}" ]; then
-							echo "DEBUG : ${MAC} is a new host !"
-							PEAKUSAGE_IN=0
-							PEAKUSAGE_OUT=0
-							OFFPEAKUSAGE_IN=0
-							OFFPEAKUSAGE_OUT=0
-						    else
-							PEAKUSAGE_IN=$(echo ${LINE} | cut -f2 -s -d, )
-							PEAKUSAGE_OUT=$(echo ${LINE} | cut -f3 -s -d, )
-							OFFPEAKUSAGE_IN=$(echo ${LINE} | cut -f4 -s -d, )
-							OFFPEAKUSAGE_OUT=$(echo ${LINE} | cut -f5 -s -d, )
-						    fi
-						    
-						    if [ "${3}" = "offpeak" ]; then
-							OFFPEAKUSAGE_IN=$((${OFFPEAKUSAGE_IN}+${IN}))
-							OFFPEAKUSAGE_OUT=$((${OFFPEAKUSAGE_OUT}+${OUT}))
-						    else
-							PEAKUSAGE_IN=$((${PEAKUSAGE_IN}+${IN}))
-							PEAKUSAGE_OUT=$((${PEAKUSAGE_OUT}+${OUT}))
-						    fi
-
-						    grep -v "${MAC}" ${2} > /tmp/db_$$.tmp
-						    mv /tmp/db_$$.tmp ${2}
-						    echo ${MAC},${PEAKUSAGE_IN},${PEAKUSAGE_OUT},${OFFPEAKUSAGE_IN},${OFFPEAKUSAGE_OUT},$(date "+%d-%m-%Y %H:%M") >> ${2}
-						fi
-					    done
+	egrep -v "0x0|^IP" /proc/net/arp  | \
+	    while read IP TYPE FLAGS MAC MASK IFACE
+	    do
+		#Add new data to the graph. Count in Kbs to deal with 16 bits signed values (up to 2G only)
+		#Have to use temporary files because of crappy busybox shell
+		grep ${IP} /tmp/traffic_$$.tmp | \
+		    while read PKTS BYTES TARGET PROT OPT IFIN IFOUT SRC DST
+		    do
+			[ "${DST}" = "${IP}" ] && echo $((${BYTES}/1000)) > /tmp/in_$$.tmp
+			[ "${SRC}" = "${IP}" ] && echo $((${BYTES}/1000)) > /tmp/out_$$.tmp
+		    done
+		[[ -f /tmp/in_$$.tmp ]] || [[ -f /tmp/out_$$.tmp ]] || continue
+		IN=$(cat /tmp/in_$$.tmp 2>/dev/null)
+		OUT=$(cat /tmp/out_$$.tmp 2>/dev/null)
+		rm -f /tmp/in_$$.tmp
+		rm -f /tmp/out_$$.tmp
+		
+		if [ "${IN}" -gt 0 -o "${OUT}" -gt 0 ];  then
+		    echo "DEBUG : New traffic for ${MAC} since last update : ${IN}k:${OUT}k"
+		    
+		    LINE=$(grep ${MAC} ${2})
+		    if [ -z "${LINE}" ]; then
+			echo "DEBUG : ${MAC} is a new host !"
+			PEAKUSAGE_IN=0
+			PEAKUSAGE_OUT=0
+			OFFPEAKUSAGE_IN=0
+			OFFPEAKUSAGE_OUT=0
+		    else
+			PEAKUSAGE_IN=$(echo ${LINE} | cut -f2 -s -d, )
+			PEAKUSAGE_OUT=$(echo ${LINE} | cut -f3 -s -d, )
+			OFFPEAKUSAGE_IN=$(echo ${LINE} | cut -f4 -s -d, )
+			OFFPEAKUSAGE_OUT=$(echo ${LINE} | cut -f5 -s -d, )
+		    fi
+		    
+		    if [ "${3}" = "offpeak" ]; then
+			OFFPEAKUSAGE_IN=$((${OFFPEAKUSAGE_IN}+${IN}))
+			OFFPEAKUSAGE_OUT=$((${OFFPEAKUSAGE_OUT}+${OUT}))
+		    else
+			PEAKUSAGE_IN=$((${PEAKUSAGE_IN}+${IN}))
+			PEAKUSAGE_OUT=$((${PEAKUSAGE_OUT}+${OUT}))
+		    fi
+		    
+		    grep -v "${MAC}" ${2} > /tmp/db_$$.tmp
+		    mv /tmp/db_$$.tmp ${2}
+		    echo ${MAC},${PEAKUSAGE_IN},${PEAKUSAGE_OUT},${OFFPEAKUSAGE_IN},${OFFPEAKUSAGE_OUT},$(date "+%d-%m-%Y %H:%M") >> ${2}
+		fi
+	    done
 	
 	#Free some memory
 	rm -f /tmp/*_$$.tmp
