@@ -77,10 +77,10 @@ case $1 in
 		    iptables -t $table -nL RRDIPT_$chain | grep "${IP} " > /dev/null
 		    if [ $? -ne 0 ]; then
 			if [ "$chain" = "OUTPUT" -o "$chain" = "FORWARD" ]; then
-			    iptables -I RRDIPT_$chain -d ${IP} -j RETURN
+			    iptables -t $table -I RRDIPT_$chain -d ${IP} -j RETURN
 			fi
 			if [ "$chain" = "INPUT" -o "$chain" = "FORWARD" ]; then
-			    iptables -I RRDIPT_$chain -s ${IP} -j RETURN
+			    iptables -t $table -I RRDIPT_$chain -s ${IP} -j RETURN
 			fi
 		    fi
 		done
@@ -89,9 +89,9 @@ case $1 in
 	    # can detect gateway IPs: route -n | grep '^[0-9]' | awk '{print $2}' | sort | uniq | grep -v 0.0.0.0
 	    if [ -n "$tun" ]; then
 		if [ "$chain" = "OUTPUT" ]; then
-		    iptables -A RRDIPT_$chain -o $tun -j RETURN
+		    iptables -t $table -A RRDIPT_$chain -o $tun -j RETURN
 		elif [ "$chain" = "INPUT" ]; then
-		    iptables -A RRDIPT_$chain -i $tun -j RETURN
+		    iptables -t $table -A RRDIPT_$chain -i $tun -j RETURN
 		fi
 	    fi
 	done # for all chains
@@ -227,14 +227,16 @@ case $1 in
 
     "remove" )
 	for chain in $chains; do
-	    iptables -D $chain -j RRDIPT_$chain 2> /dev/null
+            table=$(egrep "^$chain " /tmp/tables | cut -d' ' -f2)
+            echo $table
+	    iptables -t $table -D $chain -j RRDIPT_$chain 2> /dev/null
 	    true
 	    a=$?
 	    while [[ $a -eq 0 ]]; do
-		iptables -D RRDIPT_$chain 1 2> /dev/null
+		iptables -t $table -D RRDIPT_$chain 1 2> /dev/null
 		a=$?
 	    done
-	    iptables -X RRDIPT_$chain 2> /dev/null
+	    iptables -t $table -X RRDIPT_$chain 2> /dev/null
 	done
 	;;
     
