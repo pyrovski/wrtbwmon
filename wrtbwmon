@@ -67,8 +67,12 @@ case ${1} in
 		    #Add iptable rules (if non existing).
 		    iptables -nL RRDIPT_$chain | grep "${IP} " > /dev/null
 		    if [ $? -ne 0 ]; then
-			iptables -I RRDIPT_$chain -d ${IP} -j RETURN
-			iptables -I RRDIPT_$chain -s ${IP} -j RETURN
+			if [ "$chain" = "OUTPUT" -o "$chain" = "FORWARD" ]; then
+			    iptables -I RRDIPT_$chain -d ${IP} -j RETURN
+			fi
+			if [ "$chain" = "INPUT" -o "$chain" = "FORWARD" ]; then
+			    iptables -I RRDIPT_$chain -s ${IP} -j RETURN
+			fi
 		    fi
 		done
 
