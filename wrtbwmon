@@ -129,20 +129,21 @@ case $1 in
 			OFFPEAKUSAGE_IN=0
 			OFFPEAKUSAGE_OUT=0
 		    else
-			echo $LINE | cut -s -d, -f2- > "/tmp/${MAC}_$$.tmp"
+			echo $LINE | cut -s -d, -f2-5 | tr ',' ' ' > "/tmp/${MAC}_$$.tmp"
 			read PEAKUSAGE_IN PEAKUSAGE_OUT OFFPEAKUSAGE_IN OFFPEAKUSAGE_OUT < "/tmp/${MAC}_$$.tmp"
 		    fi
+		    echo $PEAKUSAGE_IN $PEAKUSAGE_OUT $OFFPEAKUSAGE_IN $OFFPEAKUSAGE_OUT
 		    
 		    if [ "${3}" = "offpeak" ]; then
-			echo $LINE | cut -f4,5 -s -d, > "/tmp/${MAC}_$$.tmp"
+			echo $LINE | cut -f4,5 -s -d, | tr ',' ' ' > "/tmp/${MAC}_$$.tmp"
 			read OFFPEAKUSAGE_IN OFFPEAKUSAGE_OUT < "/tmp/${MAC}_$$.tmp"
-			OFFPEAKUSAGE_IN=$((${OFFPEAKUSAGE_IN}+${IN}))
-			OFFPEAKUSAGE_OUT=$((${OFFPEAKUSAGE_OUT}+${OUT}))
+			OFFPEAKUSAGE_IN=$((OFFPEAKUSAGE_IN + IN))
+			OFFPEAKUSAGE_OUT=$((OFFPEAKUSAGE_OUT + OUT))
 		    else
-			echo $LINE | cut -f2,3 -s -d, > "/tmp/${MAC}_$$.tmp"
+			echo $LINE | cut -f2,3 -s -d, | tr ',' ' ' > "/tmp/${MAC}_$$.tmp"
 			read PEAKUSAGE_IN PEAKUSAGE_OUT < "/tmp/${MAC}_$$.tmp"
-			PEAKUSAGE_IN=$((${PEAKUSAGE_IN}+${IN}))
-			PEAKUSAGE_OUT=$((${PEAKUSAGE_OUT}+${OUT}))
+			PEAKUSAGE_IN=$((PEAKUSAGE_IN + IN))
+			PEAKUSAGE_OUT=$((PEAKUSAGE_OUT + OUT))
 		    fi
 
 		    rm -f "/tmp/${MAC}_$$.tmp"
