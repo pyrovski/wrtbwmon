@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 #
 # Traffic logging tool for OpenWRT-based routers
 #
