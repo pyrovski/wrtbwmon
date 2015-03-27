@@ -31,8 +31,7 @@ DEBUG=1
 tun=tun0
 DB=$2
 
-#!@todo first_date
-header="#mac,ip,iface,peak_in,peak_out,offpeak_in,offpeak_out,last_date"
+header="#mac,ip,iface,peak_in,peak_out,offpeak_in,offpeak_out,first_date,last_date"
 
 dateFormat()
 {
@@ -132,7 +131,6 @@ updatedb()
 	OFFPEAKUSAGE_IN=0
 	OFFPEAKUSAGE_OUT=0
 
-	#!@todo store in table
 	firstDate=$(dateFormat)
 	
 	#!@todo get hostname with: nslookup $IP | grep "$IP " | cut -d' ' -f4
