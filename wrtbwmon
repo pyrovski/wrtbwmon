@@ -27,12 +27,16 @@
 trap "unlock; exit 1" SIGINT
 
 chains='INPUT OUTPUT FORWARD'
-DEBUG=
+DEBUG=1
 tun=tun0
+DB=$2
+
+#!@todo first_date
+header="#mac,ip,iface,peak_in,peak_out,offpeak_in,offpeak_out,last_date"
 
 dateFormat()
 {
-    date "+%d-%m-%Y %H:%M:%S"
+    date "+%d-%m-%Y_%H:%M:%S"
 }
 
 lock()
@@ -52,17 +56,126 @@ unlock()
     rm -f /tmp/wrtbwmon.lock
 }
 
+# chain
+getTable()
+{
+    grep "^$1 " /tmp/tables | cut -d' ' -f2
+}
+
+# table chain tun
+newRuleTUN()
+{
+    table=$1
+    chain=$2
+    tun=$3
+    
+    iptables -t $table -nvL RRDIPT_$chain | grep " $tun " > /dev/null
+    if [ "$?" -ne 0 ]; then
+	if [ "$2" = "OUTPUT" ]; then
+	    iptables -t $table -A RRDIPT_$chain -o $tun -j RETURN
+	elif [ "$chain" = "INPUT" ]; then
+	    iptables -t $table -A RRDIPT_$chain -i $tun -j RETURN
+	fi
+    fi
+}
+
+# table chain IP
+newRule()
+{
+    table=$1
+    chain=$2
+    IP=$3
+
+    #Add iptable rules (if non existing).
+    iptables -t $table -nL RRDIPT_$chain | grep "$IP " > /dev/null
+    if [ $? -ne 0 ]; then
+	if [ "$chain" = "OUTPUT" -o "$chain" = "FORWARD" ]; then
+	    iptables -t $table -I RRDIPT_$chain -d $IP -j RETURN
+	fi
+	if [ "$chain" = "INPUT" -o "$chain" = "FORWARD" ]; then
+	    iptables -t $table -I RRDIPT_$chain -s $IP -j RETURN
+	fi
+    fi
+}
+
+
+# MAC IP IFACE IN OUT DB
+updatedb()
+{
+    MAC=$1
+    IP=$2
+    IFACE=$3
+    IN=$4
+    OUT=$5
+    DB=$6
+    
+    [ -n "$DEBUG" ] && echo "DEBUG: New traffic for $MAC/$IP since last update: $IN:$OUT"
+    
+    LINE=$(grep ${MAC} $DB)
+    if [ -z "$LINE" ]; then
+	[ -n "$DEBUG" ] && echo "DEBUG: $MAC/$IP is a new host !"
+
+	# add rules for new host
+	for chain in $chains; do
+            table=$(getTable $chain)
+	    if [ "$IP" = "NA" ]; then
+		if [ -n "$tun" ]; then
+		    newRuleTUN $table $chain $tun
+		fi
+	    else
+		newRule $table $chain $IP
+	    fi
+	done
+	
+	PEAKUSAGE_IN=0
+	PEAKUSAGE_OUT=0
+	OFFPEAKUSAGE_IN=0
+	OFFPEAKUSAGE_OUT=0
+
+	#!@todo store in table
+	firstDate=$(dateFormat)
+	
+	#!@todo get hostname with: nslookup $IP | grep "$IP " | cut -d' ' -f4
+    else
+	echo $LINE | cut -s -d, -f4-8 > "/tmp/${MAC}_$$.tmp"
+	IFS=, read PEAKUSAGE_IN PEAKUSAGE_OUT OFFPEAKUSAGE_IN OFFPEAKUSAGE_OUT firstDate < "/tmp/${MAC}_$$.tmp"
+    fi
+    
+    if [ "${3}" = "offpeak" ]; then
+	echo $LINE | cut -f6,7 -s -d, > "/tmp/${MAC}_$$.tmp"
+	IFS=, read OFFPEAKUSAGE_IN OFFPEAKUSAGE_OUT < "/tmp/${MAC}_$$.tmp"
+	OFFPEAKUSAGE_IN=$((OFFPEAKUSAGE_IN + IN))
+	OFFPEAKUSAGE_OUT=$((OFFPEAKUSAGE_OUT + OUT))
+    else
+	echo $LINE | cut -f4,5 -s -d, > "/tmp/${MAC}_$$.tmp"
+	IFS=, read PEAKUSAGE_IN PEAKUSAGE_OUT < "/tmp/${MAC}_$$.tmp"
+	PEAKUSAGE_IN=$((PEAKUSAGE_IN + IN))
+	PEAKUSAGE_OUT=$((PEAKUSAGE_OUT + OUT))
+    fi
+
+    rm -f "/tmp/${MAC}_$$.tmp"
+    
+    #!@todo combine updates
+    grep -v "^$MAC" $DB > /tmp/db_$$.tmp
+
+    trap "" SIGINT
+    mv /tmp/db_$$.tmp $DB
+
+    echo $MAC,$IP,$IFACE,$PEAKUSAGE_IN,$PEAKUSAGE_OUT,$OFFPEAKUSAGE_IN,$OFFPEAKUSAGE_OUT,$firstDate,$(dateFormat) >> $DB
+    trap "unlock; exit 1" SIGINT
+}
+
 echo 'INPUT filter
 OUTPUT filter
 FORWARD mangle' > /tmp/tables
 
-#!@todo track interfaces and IP addresses in table
+#!@todo distinguish WAN<->LAN traffic from LAN<->LAN traffic
 
 case $1 in
 
     "setup" )
 	for chain in $chains; do
-            table=$(egrep "^$chain " /tmp/tables | cut -d' ' -f2)
+            table=$(getTable $chain)
             echo $table
 	    #Create the RRDIPT_$chain chain (it doesn't matter if it already exists).
 	    iptables -t $table -N RRDIPT_$chain 2> /dev/null
@@ -81,45 +194,46 @@ case $1 in
             cat /proc/net/arp | tail -n +2 | \
 		while read IP TYPE FLAGS MAC MASK IFACE
 		do
-		    #Add iptable rules (if non existing).
-		    iptables -t $table -nL RRDIPT_$chain | grep "${IP} " > /dev/null
-		    if [ $? -ne 0 ]; then
-			if [ "$chain" = "OUTPUT" -o "$chain" = "FORWARD" ]; then
-			    iptables -t $table -I RRDIPT_$chain -d ${IP} -j RETURN
-			fi
-			if [ "$chain" = "INPUT" -o "$chain" = "FORWARD" ]; then
-			    iptables -t $table -I RRDIPT_$chain -s ${IP} -j RETURN
-			fi
-		    fi
+		    newRule $table $chain $IP
 		done
 
 	    #!@todo automate this;
 	    # can detect gateway IPs: route -n | grep '^[0-9]' | awk '{print $2}' | sort | uniq | grep -v 0.0.0.0
 	    if [ -n "$tun" ]; then
-		if [ "$chain" = "OUTPUT" ]; then
-		    iptables -t $table -A RRDIPT_$chain -o $tun -j RETURN
-		elif [ "$chain" = "INPUT" ]; then
-		    iptables -t $table -A RRDIPT_$chain -i $tun -j RETURN
-		fi
+		newRuleTUN $table $chain $tun
 	    fi
 	done # for all chains
 	
 	;;
     
     "update" )
-	[ -z "$2" ] && echo "ERROR: Missing argument 2" && exit 1	
-	[ ! -f "$2" ] && touch "$2"
-	[ ! -w "$2" ] && echo "ERROR: $2 not writable" && exit 1
+	[ -z "$DB" ] && echo "ERROR: Missing argument 2" && exit 1	
+	[ ! -f "$DB" ] && echo $header > "$DB"
+	[ ! -w "$DB" ] && echo "ERROR: $DB not writable" && exit 1
 
 	lock
 
 	#Read and reset counters
 	for chain in $chains; do
-            table=$(egrep "^$chain " /tmp/tables | cut -d' ' -f2)
+	    table=$(getTable $chain)
 	    iptables -t $table -L RRDIPT_$chain -vnxZ > /tmp/traffic_${chain}_$$.tmp
 	done
 
-	#!@todo read tun data
+	# read tun data
+	if [ -n "$tun" ]; then
+	    IN=0
+	    OUT=0
+	    for chain in $chains; do
+		grep " $tun " /tmp/traffic_${chain}_$$.tmp > /tmp/${tun}_${chain}_$$.tmp
+		read PKTS BYTES TARGET PROT OPT IFIN IFOUT SRC DST < /tmp/${tun}_${chain}_$$.tmp
+		[ "$chain" = "OUTPUT" -o "$chain" = "FORWARD" ] && [ "$IFOUT" = "$tun" ] && OUT=$((OUT + BYTES))
+		[ "$chain" = "INPUT" -o "$chain" = "FORWARD" ] && [ "$IFIN" = "$tun" ] && IN=$((IN + BYTES))
+		rm -f /tmp/${tun}_${chain}_$$.tmp
+	    done
+	    if [ "$IN" -gt 0 -o "$OUT" -gt 0 ]; then
+		updatedb "($tun)" NA $tun $IN $OUT $DB
+	    fi
+	fi
 	
         tail -n +2 /proc/net/arp  | \
 	    while read IP TYPE FLAGS MAC MASK IFACE
@@ -128,54 +242,18 @@ case $1 in
 		OUT=0
 		#Add new data to the graph.
 		for chain in $chains; do
-		    grep ${IP} /tmp/traffic_${chain}_$$.tmp > /tmp/${IP}_${chain}_$$.tmp
+		    grep $IP /tmp/traffic_${chain}_$$.tmp > /tmp/${IP}_${chain}_$$.tmp
 		    while read PKTS BYTES TARGET PROT OPT IFIN IFOUT SRC DST
 		    do
-			[ "$chain" = "OUTPUT" -o "$chain" = "FORWARD" ] && [ "${DST}" = "${IP}" ] && IN=$((IN + BYTES))
-			[ "$chain" = "INPUT" -o "$chain" = "FORWARD" ] && [ "${SRC}" = "${IP}" ] && OUT=$((OUT + BYTES))
+			#!@todo OUT and IN used here refer to the IP's perspective, not ours
+			[ "$chain" = "OUTPUT" -o "$chain" = "FORWARD" ] && [ "$DST" = "$IP" ] && IN=$((IN + BYTES))
+			[ "$chain" = "INPUT" -o "$chain" = "FORWARD" ] && [ "$SRC" = "$IP" ] && OUT=$((OUT + BYTES))
 		    done < /tmp/${IP}_${chain}_$$.tmp
 		    rm -f /tmp/${IP}_${chain}_$$.tmp
 		done
-		[[ $IN -gt 0 ]] || [[ $OUT -gt 0 ]] || continue
 		
-		if [ "${IN}" -gt 0 -o "${OUT}" -gt 0 ];  then
-		    [ -n "$DEBUG" ] && echo "DEBUG: New traffic for ${MAC} since last update: ${IN}:${OUT}"
-		    
-		    LINE=$(grep ${MAC} $2)
-		    if [ -z "${LINE}" ]; then
-			[ -n "$DEBUG" ] && echo "DEBUG: ${MAC} is a new host !"
-			PEAKUSAGE_IN=0
-			PEAKUSAGE_OUT=0
-			OFFPEAKUSAGE_IN=0
-			OFFPEAKUSAGE_OUT=0
-
-			#!@todo store in table
-			firstDate=$(dateFormat)
-			
-			#!@todo get hostname with: nslookup $IP | grep "$IP " | cut -d' ' -f4
-		    else
-			echo $LINE | cut -s -d, -f4-7 | tr ',' ' ' > "/tmp/${MAC}_$$.tmp"
-			read PEAKUSAGE_IN PEAKUSAGE_OUT OFFPEAKUSAGE_IN OFFPEAKUSAGE_OUT < "/tmp/${MAC}_$$.tmp"
-		    fi
-		    
-		    if [ "${3}" = "offpeak" ]; then
-			echo $LINE | cut -f6,7 -s -d, | tr ',' ' ' > "/tmp/${MAC}_$$.tmp"
-			read OFFPEAKUSAGE_IN OFFPEAKUSAGE_OUT < "/tmp/${MAC}_$$.tmp"
-			OFFPEAKUSAGE_IN=$((OFFPEAKUSAGE_IN + IN))
-			OFFPEAKUSAGE_OUT=$((OFFPEAKUSAGE_OUT + OUT))
-		    else
-			echo $LINE | cut -f4,5 -s -d, | tr ',' ' ' > "/tmp/${MAC}_$$.tmp"
-			read PEAKUSAGE_IN PEAKUSAGE_OUT < "/tmp/${MAC}_$$.tmp"
-			PEAKUSAGE_IN=$((PEAKUSAGE_IN + IN))
-			PEAKUSAGE_OUT=$((PEAKUSAGE_OUT + OUT))
-		    fi
-
-		    rm -f "/tmp/${MAC}_$$.tmp"
-		    
-		    grep -v "${MAC}" $2 > /tmp/db_$$.tmp
-		    mv /tmp/db_$$.tmp $2
-
-		    echo ${MAC},${IP},${IFACE},${PEAKUSAGE_IN},${PEAKUSAGE_OUT},${OFFPEAKUSAGE_IN},${OFFPEAKUSAGE_OUT},$(dateFormat) >> $2
+		if [ "${IN}" -gt 0 -o "${OUT}" -gt 0 ]; then
+		    updatedb $MAC $IP $IFACE $IN $OUT $DB
 		fi
 	    done
 
@@ -186,7 +264,7 @@ case $1 in
     
     "publish" )
 
-	[ -z "$2" ] && echo "ERROR: Missing argument 2" && exit 1
+	[ -z "$DB" ] && echo "ERROR: Missing database argument" && exit 1
 	[ -z "$3" ] && echo "ERROR: Missing argument 3" && exit 1
 	
 	USERSFILE="/etc/dnsmasq.conf"
@@ -197,7 +275,7 @@ case $1 in
 	# first do some number crunching - rewrite the database so that it is sorted
 	lock
 	touch /tmp/sorted_$$.tmp
-	cat $2 | while IFS=, read MAC PEAKUSAGE_IN PEAKUSAGE_OUT OFFPEAKUSAGE_IN OFFPEAKUSAGE_OUT LASTSEEN
+	cat $DB | while IFS=, read MAC PEAKUSAGE_IN PEAKUSAGE_OUT OFFPEAKUSAGE_IN OFFPEAKUSAGE_OUT LASTSEEN
 		   do
 		       echo ${PEAKUSAGE_IN},${PEAKUSAGE_OUT},${OFFPEAKUSAGE_IN},${OFFPEAKUSAGE_OUT},${MAC},${LASTSEEN} >> /tmp/sorted_$$.tmp
 		   done
@@ -239,18 +317,7 @@ case $1 in
         ;;
 
     "remove" )
-	for chain in $chains; do
-            table=$(egrep "^$chain " /tmp/tables | cut -d' ' -f2)
-            echo $table
-	    iptables -t $table -D $chain -j RRDIPT_$chain 2> /dev/null
-	    true
-	    a=$?
-	    while [[ $a -eq 0 ]]; do
-		iptables -t $table -D RRDIPT_$chain 1 2> /dev/null
-		a=$?
-	    done
-	    iptables -t $table -X RRDIPT_$chain 2> /dev/null
-	done
+	iptables-save | grep -v RRDIPT | iptables-restore
 	;;
     
     *)
