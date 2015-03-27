@@ -167,7 +167,8 @@ echo 'INPUT filter
 OUTPUT filter
 FORWARD mangle' > /tmp/tables
 
-#!@todo distinguish WAN<->LAN traffic from LAN<->LAN traffic
+#!@todo distinguish WAN<->LAN traffic from LAN<->LAN traffic.
+# This can be accomplished by setting src IP != our LAN IP in the rules.
 
 case $1 in
 
@@ -188,6 +189,7 @@ case $1 in
 		fi
 		iptables -t $table -I $chain -j RRDIPT_$chain
 	    fi
+
 	    #For each host in the ARP table
             cat /proc/net/arp | tail -n +2 | \
 		while read IP TYPE FLAGS MAC MASK IFACE
