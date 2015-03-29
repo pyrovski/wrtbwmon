@@ -327,51 +327,69 @@ case $1 in
 	[ -z "$DB" ] && echo "ERROR: Missing database argument" && exit 1
 	[ -z "$3" ] && echo "ERROR: Missing argument 3" && exit 1
 	
-	USERSFILE=/etc/dnsmasq.conf
+	USERSFILE=/tmp/dhcp.leases
+	#/etc/dnsmasq.conf
 	[ -f "$USERSFILE" ] || USERSFILE=/tmp/dnsmasq.conf
 	[ -z "$4" ] || USERSFILE=$4
 	[ -f "$USERSFILE" ] || USERSFILE=/dev/null
 
 	# first do some number crunching - rewrite the database so that it is sorted
 	lock
-	awk -F, '{OFS=","; a=$4; $4=""; print a OFS $0}' < $DB | sort -n > /tmp/sorted_$$.tmp
+	grep -v '^#' $DB | awk -F, '{OFS=","; a=$4; $4=""; print a OFS $0}' | tr -s ',' | sort -n > /tmp/sorted_$$.tmp
 	unlock
 
         # create HTML page
-        echo "<html><head><title>Traffic</title><script type=\"text/javascript\">" > ${3}
-        echo "function getSize(size) {" >> ${3}
-        echo "var prefix=new Array(\"\",\"k\",\"M\",\"G\",\"T\",\"P\",\"E\",\"Z\"); var base=1000;" >> ${3}
-        echo "var pos=0; while (size>base) { size/=base; pos++; } if (pos > 2) precision=1000; else precision = 1;" >> ${3}
-        echo "return (Math.round(size*precision)/precision)+' '+prefix[pos];}" >> ${3}
-        echo "</script></head><body><h1>Total Usage :</h1>" >> ${3}
-        echo "<table border="1"><tr bgcolor=silver><th>User</th><th>Peak download</th><th>Peak upload</th><th>Offpeak download</th><th>Offpeak upload</th><th>Last seen</th></tr>" >> ${3}
-        echo "<script type=\"text/javascript\">" >> ${3}
-
-        echo "var values = new Array(" >> ${3}
-        sort -n /tmp/sorted_$$.tmp | while IFS=, read PEAKUSAGE_IN PEAKUSAGE_OUT OFFPEAKUSAGE_IN OFFPEAKUSAGE_OUT MAC LASTSEEN
-				     do
-					 echo "new Array(" >> ${3}
-					 USER=$(grep "${MAC}" "${USERSFILE}" | cut -f2 -s -d, )
-					 [ -z "$USER" ] && USER=${MAC}
-					 echo "\"${USER}\",${PEAKUSAGE_IN}000,${PEAKUSAGE_OUT}000,${OFFPEAKUSAGE_IN}000,${OFFPEAKUSAGE_OUT}000,\"${LASTSEEN}\")," >> ${3}
-				     done
-        echo "0);" >> ${3}
-
-        echo "for (i=0; i < values.length-1; i++) {document.write(\"<tr><td>\");" >> ${3}
-        echo "document.write(values[i][0]);document.write(\"</td>\");" >> ${3}
-	for j in 1 2 3 4; do
-            echo "document.write(\"<td>\");document.write(getSize(values[i][$j]));document.write(\"</td>\");" >> ${3}
-	done
-        echo "document.write(\"<td>\");document.write(values[i][5]);document.write(\"</td>\");" >> ${3}
-        echo "document.write(\"</tr>\");" >> ${3}
-        echo "}</script></table>" >> ${3}
-        echo "<br /><small>This page was generated on `date`</small>" 2>&1 >> ${3}
-        echo "</body></html>" >> ${3}
-
-        #Free some memory
-        rm -f /tmp/*_$$.tmp
-        ;;
-
+	rm -f "$3"
+        echo "<html><head><title>Traffic</title>
+<script src="http://code.jquery.com/jquery-1.8.2.js"></script>
+<script src="http://jquery-csv.googlecode.com/git/src/jquery.csv.js"></script>
+<script type=\"text/javascript\">
+function getSize(size) {
+    var prefix=new Array(\"\",\"k\",\"M\",\"G\",\"T\",\"P\",\"E\",\"Z\"); var base=1000;
+    var pos=0;
+    while (size>base) {
+        size/=base; pos++;
+    }
+    if (pos > 2) precision=1000; else precision = 1;
+    return (Math.round(size*precision)/precision)+' '+prefix[pos];}
+</script></head>
+<body><h1>Total Usage :</h1>
+<table border="1"><tr bgcolor=silver><th>User</th><th>Peak download</th><th>Peak upload</th><th>Offpeak download</th><th>Offpeak upload</th><th>Last seen</th></tr>" >> ${3}
+	echo "<script type=\"text/javascript\">
+var values = new Array(" >> ${3}
+	while IFS=, read PEAKUSAGE_IN MAC IP IFACE PEAKUSAGE_OUT OFFPEAKUSAGE_IN OFFPEAKUSAGE_OUT FIRSTSEEN LASTSEEN
+	do
+	    echo "new Array(" >> ${3}
+	    USER=$(grep "${MAC}" "${USERSFILE}" | cut -f2 -s -d, )
+	    [ -z "$USER" ] && USER=${MAC}
+	    echo "\"${USER}\",${PEAKUSAGE_IN},${PEAKUSAGE_OUT},${OFFPEAKUSAGE_IN},${OFFPEAKUSAGE_OUT},\"${LASTSEEN}\")," | tee -a ${3}
+	done < /tmp/sorted_$$.tmp
+	echo "0);" >> ${3}
+	
+	echo "
+for (i=0; i < values.length-1; i++) {
+    document.write(\"<tr><td>\");
+    document.write(values[i][0]);
+    document.write(\"</td>\");
+    for (j=1; j < 5; j++) {
+        document.write(\"<td>\");
+        document.write(getSize(values[i][j]));
+        document.write(\"</td>\");
+    }
+    document.write(\"<td>\");
+    document.write(values[i][5]);
+    document.write(\"</td>\");
+    document.write(\"</tr>\");
+}
+</script></table>" >> ${3}
+	echo "
+<br /><small>This page was generated on `date`</small>
+</body></html>" >> ${3}
+	
+	#Free some memory
+	rm -f /tmp/*_$$.tmp
+	;;
+    
     "remove" )
 	iptables-save | grep -v RRDIPT | iptables-restore
 	;;
