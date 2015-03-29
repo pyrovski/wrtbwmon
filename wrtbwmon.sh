@@ -59,6 +59,7 @@ detectWAN()
 {
     wan=$(detectIF wan)
     [ -n "$wan" ] && echo $wan && return
+    [ -n "$WAN_IF" ] && echo $WAN_IF && return
 }
 
 dateFormat()
@@ -84,34 +85,58 @@ unlock()
 }
 
 # chain
-getTable()
+newChain()
 {
-    grep "^$1 " /tmp/tables | cut -d' ' -f2
-}
+    chain=$1
+    table=$(getTable $chain)
 
-# table chain tun
-newRuleTUN()
-{
-    table=$1
-    chain=$2
-    tun=$3
+    #Create the RRDIPT_$chain chain (it doesn't matter if it already exists).
+    iptables -t $table -N RRDIPT_$chain 2> /dev/null
     
-    iptables -t $table -nvL RRDIPT_$chain | grep " $tun " > /dev/null
-    if [ "$?" -ne 0 ]; then
-	if [ "$2" = "OUTPUT" ]; then
-	    iptables -t $table -A RRDIPT_$chain -o $tun -j RETURN
-	elif [ "$chain" = "INPUT" ]; then
-	    iptables -t $table -A RRDIPT_$chain -i $tun -j RETURN
+    #Add the RRDIPT_$chain CHAIN to the $chain chain (if non existing).
+    iptables -t $table -L $chain --line-numbers -n | grep "RRDIPT_$chain" > /dev/null
+    if [ $? -ne 0 ]; then
+	iptables -t $table -L $chain -n | grep "RRDIPT_$chain" > /dev/null
+	if [ $? -eq 0 ]; then
+	    [ -n "$DEBUG" ] && echo "DEBUG: iptables chain misplaced, recreating it..."
+	    iptables -t $table -D $chain -j RRDIPT_$chain
 	fi
+	iptables -t $table -I $chain -j RRDIPT_$chain
     fi
 }
 
-# table chain IP
+# chain
+getTable()
+{
+    #grep "^$1 " /tmp/tables | cut -d' ' -f2
+    echo mangle
+}
+
+# chain tun
+newRuleIF()
+{
+    chain=$1
+    IF=$2
+    table=$(getTable $chain)
+    
+    iptables -t $table -nvL RRDIPT_$chain | grep " $IF " > /dev/null
+    if [ "$?" -ne 0 ]; then
+	if [ "$chain" = "OUTPUT" ]; then
+	    iptables -t $table -A RRDIPT_$chain -o $IF -j RETURN
+	elif [ "$chain" = "INPUT" ]; then
+	    iptables -t $table -A RRDIPT_$chain -i $IF -j RETURN
+	fi
+    elif [ -n "$DEBUG" ]; then
+	echo "DEBUG: table $table chain $chain rule $IF already exists?"
+    fi
+}
+
+# chain IP
 newRule()
 {
-    table=$1
-    chain=$2
-    IP=$3
+    chain=$1
+    IP=$2
+    table=$(getTable $chain)
 
     #Add iptable rules (if non existing).
     iptables -t $table -nL RRDIPT_$chain | grep "$IP " > /dev/null
@@ -144,13 +169,12 @@ updatedb()
 
 	# add rules for new host
 	for chain in $chains; do
-            table=$(getTable $chain)
 	    if [ "$IP" = "NA" ]; then
 		if [ -n "$tun" ]; then
-		    newRuleTUN $table $chain $tun
+		    newRuleIF $chain $tun
 		fi
 	    else
-		newRule $table $chain $IP
+		newRule $chain $IP
 	    fi
 	done
 	
@@ -193,49 +217,52 @@ updatedb()
 
 ############################################################
 
-lan=$(detectLAN)
-wan=$(detectWAN)
-
-echo 'INPUT filter
-OUTPUT filter
-FORWARD mangle' > /tmp/tables
+#echo 'INPUT filter
+#OUTPUT filter
+#FORWARD mangle' > /tmp/tables
 
 #!@todo distinguish WAN<->LAN traffic from LAN<->LAN traffic.
 # This can be accomplished by setting src IP != our LAN IP in the rules.
 
-case $1 in
+# Track forwarded data over the WAN interface via the FORWARD chain,
+# and locally generated data over the WAN via the INPUT and OUTPUT
+# chains. The old wrtbwmon script used interface filtering to get LAN
+# IPs, and only monitored the FORWARD chain. If the host running
+# wrtbwmon is also generating traffic, we should count that,
+# too. Restricting measurement to the WAN interface also provides
+# compatibility for setups that route traffic between wired and
+# wireless networks.
 
+case $1 in
     "setup" )
 	for chain in $chains; do
-            table=$(getTable $chain)
-            echo $table
-	    #Create the RRDIPT_$chain chain (it doesn't matter if it already exists).
-	    iptables -t $table -N RRDIPT_$chain 2> /dev/null
+	    newChain $chain
+	done # for all chains
 
-	    #Add the RRDIPT_$chain CHAIN to the $chain chain (if non existing).
-	    iptables -t $table -L $chain --line-numbers -n | grep "RRDIPT_$chain" > /dev/null
-	    if [ $? -ne 0 ]; then
-		iptables -t $table -L $chain -n | grep "RRDIPT_$chain" > /dev/null
-		if [ $? -eq 0 ]; then
-		    [ -n "$DEBUG" ] && echo "DEBUG: iptables chain misplaced, recreating it..."
-		    iptables -t $table -D $chain -j RRDIPT_$chain
-		fi
-		iptables -t $table -I $chain -j RRDIPT_$chain
-	    fi
+	chain=FORWARD
 
-	    #For each host in the ARP table
-            cat /proc/net/arp | tail -n +2 | \
-		while read IP TYPE FLAGS MAC MASK IFACE
-		do
-		    newRule $table $chain $IP
-		done
+	#For each host in the ARP table
+        cat /proc/net/arp | tail -n +2 | \
+	    while read IP TYPE FLAGS MAC MASK IFACE
+	    do
+		newRule $chain $IP
+	    done	
 
+	lan=$(detectLAN)
+	wan=$(detectWAN)
+	if [ -n "$wan" ]; then
+	    wanIP=`ifconfig $wan | grep -o 'inet addr:[0-9.]\+' | cut -d':' -f2`
+	else
+	    echo "Warning: failed to detect WAN interface."
+	fi
+	
+	# track local data
+	for chain in INPUT OUTPUT; do
+	    [ -n "$wan" ] && newRuleIF $chain $wan
 	    #!@todo automate this;
 	    # can detect gateway IPs: route -n | grep '^[0-9]' | awk '{print $2}' | sort | uniq | grep -v 0.0.0.0
-	    if [ -n "$tun" ]; then
-		newRuleTUN $table $chain $tun
-	    fi
-	done # for all chains
+	    [ -n "$tun" ] && newRuleIF $chain $tun
+	done
 	
 	;;
     
