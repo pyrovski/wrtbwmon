@@ -1,1 +1,303 @@
-wrtbwmon.sh
+#!/bin/sh
+#
+# Traffic logging tool for OpenWRT-based routers
+#
+# Modified by Khalid Baheyeldin (http://baheyeldin.com)
+#
+# Based on https://gitorious.org/wrtbwmon
+# Created by Dorian Scholz (dorianscholz AT gmx.de)
+# Based on work from Emmanuel Brucy (e.brucy AT qut.edu.au)
+# Based on work from Fredrik Erlandsson (erlis AT linux.nu)
+# Based on traff_graph script by twist - http://wiki.openwrt.org/RrdTrafficWatch
+#
+# ===
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+# ===
+
+# DO NOT CHANGE ANYTHING IN THIS SCRIPT!
+# You can do so in your own wrtbwmon.conf to override
+
+# The name of the WAN Ethernet Interface
+WAN_IFACE=$(uci get network.wan.ifname)
+# This does not return br-lan on my router, therefore we override it
+# in the configuration file
+LAN_IFACE=$(uci get network.lan.ifname)
+
+# Our own name, used for directories, file names, log messages, ...etc.
+PROG=$(basename $0)
+
+# Directories
+BASE_DIR="$(dirname $0)"
+TMP_DIR="/tmp/$PROG"
+USER_WWW_DIR="/www/$PROG"
+LOCK="/$TMP_DIR/lock"
+
+# Prefix used in HTML file
+DATABASE_NAME=usage
+
+# overwrite defaults with settings specified in USER_RC
+CONFIG="$BASE_DIR/$PROG.conf"
+if [ ! -r "$CONFIG" ]; then
+  MSG="Configuration file: $CONFIG not found! Please rename the .conf.dist to .conf!"
+  echo "$MSG"
+  logger -t $PROG "$MSG"
+fi
+
+# Read the configuration file
+. "$CONFIG"
+
+# Where to save the data.
+DATA_DIR="$BASE_DIR/data"
+
+debug()
+{
+  if [ "$DEBUG" = 1 ]; then
+    logger -t $PROG "DEBUG: $*"
+  fi
+}
+
+lock()
+{
+  while [ -f $LOCK ]; do
+    if [ ! -d /proc/$(cat $LOCK) ]; then
+      logger -t $PROG "WARNING : Lockfile detected but process $(cat $LOCK) does not exist !"
+      rm -f $LOCK
+    fi
+    sleep 1
+  done
+  echo $$ > $LOCK
+}
+
+unlock()
+{
+  rm -f $LOCK
+}
+
+usage()
+{
+  logger -t $PROG "Usage : $0 {install|remove|scan|collect|devices}"
+  exit 1
+}
+
+update_db()
+{
+  DATABASE_FILE=$1
+  MAC=$2
+  NEW_IN=$3
+  NEW_OUT=$4
+  NEW_IN_EXTERNAL=$5
+  NEW_OUT_EXTERNAL=$6
+
+  debug "Updating $DATABASE_FILE"
+
+  LINE=$(grep ${MAC} ${DATABASE_FILE})
+  if [ -z "${LINE}" ]; then
+    debug "MAC address: ${MAC} is a new host!"
+    EXTERNAL_IN=0
+    EXTERNAL_OUT=0
+    INTERNAL_IN=0
+    INTERNAL_OUT=0
+  else
+    EXTERNAL_IN=$(echo ${LINE}  | cut -f2 -s -d, )
+    EXTERNAL_OUT=$(echo ${LINE} | cut -f3 -s -d, )
+    INTERNAL_IN=$(echo ${LINE}  | cut -f4 -s -d, )
+    INTERNAL_OUT=$(echo ${LINE} | cut -f5 -s -d, )
+  fi
+
+  INTERNAL_IN=$((${INTERNAL_IN}+${NEW_IN}))
+  INTERNAL_OUT=$((${INTERNAL_OUT}+${NEW_OUT}))
+  EXTERNAL_IN=$((${EXTERNAL_IN}+${NEW_IN_EXTERNAL}))
+  EXTERNAL_OUT=$((${EXTERNAL_OUT}+${NEW_OUT_EXTERNAL}))
+
+  grep -v "${MAC}" ${DATABASE_FILE} > $TMP_DIR/db_$$.tmp
+  mv $TMP_DIR/db_$$.tmp ${DATABASE_FILE}
+  echo ${MAC},${EXTERNAL_IN},${EXTERNAL_OUT},${INTERNAL_IN},${INTERNAL_OUT},$(date "+%d-%m-%Y %H:%M") >> ${DATABASE_FILE}
+}
+
+# Check command line args
+[ -z "${1}" ] && logger -t $PROG "ERROR : Missing argument 1: command" && usage
+COMMAND=${1}
+
+case ${COMMAND} in
+
+  "remove" )
+    logger -t $PROG "Removing jumps to accounting chains"
+    iptables -D FORWARD $(iptables -L FORWARD --line-numbers | grep ACCOUNTING | grep -m 1 -o [0-9]*)
+    while [ $? -eq 0 ]; do
+      iptables -D FORWARD $(iptables -L FORWARD --line-numbers | grep ACCOUNTING | grep -m 1 -o [0-9]*)
+    done
+
+    logger -t $PROG "Flushing accounting chains"
+    iptables -F ACCOUNTING_IN
+    iptables -F ACCOUNTING_OUT
+
+    logger -t $PROG "Removing accounting chains"
+    iptables -X ACCOUNTING_IN
+    iptables -X ACCOUNTING_OUT
+
+    ;;
+
+  "install" )
+    # Check/create directories and symlinks
+    [ -d $TMP_DIR ]      || mkdir -p $TMP_DIR
+    [ -d $DATA_DIR ]     || mkdir -p $DATA_DIR
+    [ -e $USER_WWW_DIR ] || ln -s $DATA_DIR $USER_WWW_DIR
+
+    # Create a symlink to the chart HTML file
+    HTML=chart.html
+    [ -e $DATA_DIR/$HTML ] || ln -s $BASE_DIR/$HTML $DATA_DIR
+
+    # Create the ACCOUNTING chains
+    iptables -N ACCOUNTING_IN 2> /dev/null
+    iptables -N ACCOUNTING_OUT 2> /dev/null
+
+    # Check if jumps to the ACCOUNTING chains are still at the start of the FORWARD chain
+    iptables -L FORWARD --line-numbers -n | grep "ACCOUNTING" | grep "^1 "
+    if [ $? -ne 0 ]; then
+      # Remove old jump rules
+      iptables -D FORWARD $(iptables -L FORWARD --line-numbers | grep ACCOUNTING | grep -m 1 -o "[0-9]*")
+      while [ $? -eq 0 ]; do
+        iptables -D FORWARD $(iptables -L FORWARD --line-numbers | grep ACCOUNTING | grep -m 1 -o "[0-9]*")
+      done
+      # Insert new jump rules at start of FORWARD chain
+      iptables -I FORWARD -i ${WAN_IFACE} -j ACCOUNTING_IN
+      iptables -I FORWARD -o ${WAN_IFACE} -j ACCOUNTING_OUT
+    fi
+
+    ;; 
+
+  "scan" )
+    # Scan the ARP table for new IP addresses, and then add them to the iptable rules
+    # This is done frequently (every minute) in case new devices are turned on
+
+    # For each host in the ARP table
+    grep ${LAN_IFACE} /proc/net/arp | while read IP TYPE FLAGS MAC MASK IFACE
+    do
+      # Add iptables rules (if they do not exist).
+      iptables -nL ACCOUNTING_IN | grep "${IP} " > /dev/null
+      if [ $? -ne 0 ]; then
+        iptables -A ACCOUNTING_IN -d ${IP} -s ${INTERNAL_NETMASK} -j RETURN
+        iptables -A ACCOUNTING_IN -d ${IP} ! -s ${INTERNAL_NETMASK} -j RETURN
+      fi
+
+      iptables -nL ACCOUNTING_OUT | grep "${IP} " > /dev/null
+      if [ $? -ne 0 ]; then
+        iptables -A ACCOUNTING_OUT -s ${IP} -d ${INTERNAL_NETMASK} -j RETURN
+        iptables -A ACCOUNTING_OUT -s ${IP} ! -d ${INTERNAL_NETMASK} -j RETURN
+      fi
+    done
+
+    ;;
+
+  "collect" )
+    DATABASE_FILE_BASE="${DATA_DIR}/${DATABASE_NAME}"
+
+    # use separate files for monthly, daily and hourly stats
+    DATABASE_FILE_M="${DATABASE_FILE_BASE}_$(date "+%Y-%m").html"
+    DATABASE_FILE_D="${DATABASE_FILE_BASE}_$(date "+%Y-%m-%d").html"
+    DATABASE_FILE_H="${DATABASE_FILE_BASE}_$(date "+%Y-%m-%d_%H").html"
+
+    lock
+
+    # read and reset counters
+    iptables -L ACCOUNTING_IN -vnxZ -t filter > $TMP_DIR/traffic_in_$$.tmp
+    iptables -L ACCOUNTING_OUT -vnxZ -t filter > $TMP_DIR/traffic_out_$$.tmp
+
+    grep -v "0x0" /proc/net/arp | egrep "[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+" | while read IP TYPE FLAGS MAC MASK IFACE
+    do
+      # add new data to the graph. Count in Kbs to deal with 16 bits signed values (up to 2G only)
+      # have to use temporary files because of crappy busybox shell
+      debug "Updating stats for ${IP}"
+
+      # incoming traffic
+      grep ${IP} $TMP_DIR/traffic_in_$$.tmp | while read PKTS BYTES TARGET PROT OPT IFIN IFOUT SRC DST
+      do
+        # check for exclude filter, to distinguish external and internal traffic
+        echo "${SRC} ${DST}" | grep "!" > /dev/null
+        if [ $? -ne 0 ]; then
+          debug "Adding internal traffic from ${SRC} to ${DST}"
+          [ "${DST}" = "${IP}" ] && echo $((${BYTES}/1000)) > $TMP_DIR/in_$$.tmp
+        else
+          debug "Adding external traffic from ${SRC} to ${DST}"
+          [ "${DST}" = "${IP}" ] && echo $((${BYTES}/1000)) > $TMP_DIR/in_external_$$.tmp
+        fi
+      done
+      IN=$(cat $TMP_DIR/in_$$.tmp)
+      IN_EXTERNAL=$(cat $TMP_DIR/in_external_$$.tmp)
+      rm -f $TMP_DIR/in_$$.tmp
+      rm -f $TMP_DIR/in_external_$$.tmp
+
+      # outgoing traffic
+      grep ${IP} $TMP_DIR/traffic_out_$$.tmp | while read PKTS BYTES TARGET PROT OPT IFIN IFOUT SRC DST
+      do
+        # check for exclude filter, to distinguish external and internal traffic
+        echo "${SRC} ${DST}" | grep "!" > /dev/null
+        if [ $? -ne 0 ]; then
+          debug "Adding internal traffic from ${SRC} to ${DST}"
+          [ "${SRC}" = "${IP}" ] && echo $((${BYTES}/1000)) > $TMP_DIR/out_$$.tmp
+        else
+          debug "Adding external traffic from ${SRC} to ${DST}"
+          [ "${SRC}" = "${IP}" ] && echo $((${BYTES}/1000)) > $TMP_DIR/out_external_$$.tmp
+        fi
+      done
+      OUT=$(cat $TMP_DIR/out_$$.tmp)
+      OUT_EXTERNAL=$(cat $TMP_DIR/out_external_$$.tmp)
+      rm -f $TMP_DIR/out_$$.tmp
+      rm -f $TMP_DIR/out_external_$$.tmp
+
+      if [ ${IN} -gt 0 -o ${OUT} -gt 0 -o ${IN_EXTERNAL} -gt 0 -o ${OUT_EXTERNAL} -gt 0 ];  then
+        debug "New traffic for ${MAC} since last collect : internal ${IN}k:${OUT}k, external ${IN_EXTERNAL}k:${OUT_EXTERNAL}k"
+
+        update_db ${DATABASE_FILE_M} ${MAC} ${IN} ${OUT} ${IN_EXTERNAL} ${OUT_EXTERNAL}
+        update_db ${DATABASE_FILE_D} ${MAC} ${IN} ${OUT} ${IN_EXTERNAL} ${OUT_EXTERNAL}
+        update_db ${DATABASE_FILE_H} ${MAC} ${IN} ${OUT} ${IN_EXTERNAL} ${OUT_EXTERNAL}
+      fi
+    done
+
+    # Free some memory
+    rm -f $TMP_DIR/*_$$.tmp
+    unlock
+    ;;
+
+  "devices" )
+    debug "Updating device list"
+
+    DEVICE_LIST="$DATA_DIR/devices.html"
+    TMP_DEVICE=$TMP_DIR/devices_$$.tmp
+
+    # If the path to dnsmasq's configuration file is not set, then default to
+    # the running location
+    if [ ! -f "$DNSMASQ_CONF" ]; then
+      DNSMASQ_CONF="/tmp/etc/dnsmasq.conf"
+    fi
+
+    egrep -o "([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2},[^,]+,[^,]+" $DNSMASQ_CONF | while IFS=, read MAC IP NAME
+    do
+      # Exclude the current MAC address
+      grep -v "${MAC}" ${DEVICE_LIST} > $TMP_DEVICE
+      mv $TMP_DEVICE ${DEVICE_LIST}
+      if [ "${NAME}" = "*" ]; then
+        NAME="${MAC}";
+      fi
+      # Add the current MAC address
+      echo "${MAC},${NAME}" >> ${DEVICE_LIST}
+    done
+    ;;
+
+  *)
+    usage
+    ;;
+
+esac

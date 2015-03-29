@@ -1,0 +1,10 @@
+# Configuration for OpenWRT Bandwidth Monitor
+
+# Local Area Network interface. This is br-lan on my router
+LAN_IFACE="br-lan"
+
+# Internal netmask
+INTERNAL_NETMASK="192.168.0.0/24"
+
+# Log messages to syslog
+DEBUG="0"
