@@ -33,6 +33,34 @@ DB=$2
 
 header="#mac,ip,iface,peak_in,peak_out,offpeak_in,offpeak_out,first_date,last_date"
 
+detectIF()
+{
+    uci=`which uci 2>/dev/null`
+    if [ -n "$uci" -a -x "$uci" ]; then
+	IF=`$uci get network.${1}.ifname`
+	[ $? -eq 0 ] && echo $IF && return
+    fi
+
+    nvram=`which nvram 2>/dev/null`
+    if [ -n "$nvram" -a -x "$nvram" ]; then
+	IF=`$nvram get ${1}_ifname`
+	[ $? -eq 0 ] && echo $IF && return
+    fi
+}
+
+detectLAN()
+{
+    [ -e /sys/class/net/br-lan ] && echo br-lan && return
+    lan=$(detectIF lan)
+    [ -n "$lan" ] && echo $lan && return
+}
+
+detectWAN()
+{
+    wan=$(detectIF wan)
+    [ -n "$wan" ] && echo $wan && return
+}
+
 dateFormat()
 {
     date "+%d-%m-%Y_%H:%M:%S"
@@ -163,6 +191,11 @@ updatedb()
     trap "unlock; exit 1" SIGINT
 }
 
+############################################################
+
+lan=$(detectLAN)
+wan=$(detectWAN)
+
 echo 'INPUT filter
 OUTPUT filter
 FORWARD mangle' > /tmp/tables
@@ -267,18 +300,14 @@ case $1 in
 	[ -z "$DB" ] && echo "ERROR: Missing database argument" && exit 1
 	[ -z "$3" ] && echo "ERROR: Missing argument 3" && exit 1
 	
-	USERSFILE="/etc/dnsmasq.conf"
-	[ -f "$USERSFILE" ] || USERSFILE="/tmp/dnsmasq.conf"
-	[ -z "$4" ] || USERSFILE=${4}
-	[ -f "$USERSFILE" ] || USERSFILE="/dev/null"
+	USERSFILE=/etc/dnsmasq.conf
+	[ -f "$USERSFILE" ] || USERSFILE=/tmp/dnsmasq.conf
+	[ -z "$4" ] || USERSFILE=$4
+	[ -f "$USERSFILE" ] || USERSFILE=/dev/null
 
 	# first do some number crunching - rewrite the database so that it is sorted
 	lock
-	touch /tmp/sorted_$$.tmp
-	cat $DB | while IFS=, read MAC PEAKUSAGE_IN PEAKUSAGE_OUT OFFPEAKUSAGE_IN OFFPEAKUSAGE_OUT LASTSEEN
-		   do
-		       echo ${PEAKUSAGE_IN},${PEAKUSAGE_OUT},${OFFPEAKUSAGE_IN},${OFFPEAKUSAGE_OUT},${MAC},${LASTSEEN} >> /tmp/sorted_$$.tmp
-		   done
+	awk -F, '{OFS=","; a=$4; $4=""; print a OFS $0}' < $DB | sort -n > /tmp/sorted_$$.tmp
 	unlock
 
         # create HTML page
