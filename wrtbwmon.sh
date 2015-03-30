@@ -335,7 +335,7 @@ case $1 in
 
 	# first do some number crunching - rewrite the database so that it is sorted
 	lock
-	grep -v '^#' $DB | awk -F, '{OFS=","; a=$4; $4=""; print a OFS $0}' | tr -s ',' | sort -n > /tmp/sorted_$$.tmp
+	grep -v '^#' $DB | awk -F, '{OFS=","; a=$4; $4=""; print a OFS $0}' | tr -s ',' | sort -rn > /tmp/sorted_$$.tmp
 	unlock
 
         # create HTML page
