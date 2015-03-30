@@ -12,9 +12,15 @@ so you can easily determine which user/device is the culprit.
 - Update table: `./wrtbwmon update /tmp/usage.db` (you can place the data table anywhere)
 - Create html page: `./wrtbwmon publish /tmp/usage.db /tmp/usage.htm`
 
-#### Regular updates
-- Install script to /usr/sbin:
-    ./install.sh
+### Regular updates
+ - Install script to /usr/sbin:
+ - 
+        ./install.sh
+
+  or
+  
+        wget -O /usr/sbin/wrtbwmon https://raw.githubusercontent.com/pyrovski/wrtbwmon/master/wrtbwmon.sh
+        
 - Add the following to root's crontab:
 
         * * * * * /usr/sbin/wrtbwmon update /tmp/usage.db
