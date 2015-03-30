@@ -27,8 +27,8 @@
 trap "unlock; exit 1" SIGINT
 
 chains='INPUT OUTPUT FORWARD'
-DEBUG=1
-tun=tun0
+DEBUG=
+tun=
 DB=$2
 
 header="#mac,ip,iface,peak_in,peak_out,offpeak_in,offpeak_out,total,first_date,last_date"
@@ -153,7 +153,7 @@ readIF()
 	    OUT=$((OUT + BYTES))
 	[ "$chain" = "INPUT" ] && [ "$IFIN" = "$IF" ] && \
 	    IN=$((IN + BYTES))
-	rm -f /tmp/${IF}_${chain}_$$.tmp
+#	rm -f /tmp/${IF}_${chain}_$$.tmp
     done
     echo "$IN $OUT"
 }
@@ -192,7 +192,7 @@ updatedb()
 	#!@todo get hostname with: nslookup $IP | grep "$IP " | cut -d' ' -f4
     else
 	echo $LINE | cut -s -d, -f4-9 > "/tmp/${MAC}_$$.tmp"
-	IFS=, read PEAKUSAGE_IN PEAKUSAGE_OUT OFFPEAKUSAGE_IN OFFPEAKUSAGE_OUT TOTAL firstDate < "/tmp/${MAC}_$$.tmp"
+	IFS=, read PEAKUSAGE_IN PEAKUSAGE_OUT OFFPEAKUSAGE_IN OFFPEAKUSAGE_OUT _ firstDate < "/tmp/${MAC}_$$.tmp"
     fi
     
     if [ "${3}" = "offpeak" ]; then
@@ -208,7 +208,7 @@ updatedb()
     fi
     TOTAL=$((OFFPEAKUSAGE_OUT + OFFPEAKUSAGE_IN + PEAKUSAGE_OUT + PEAKUSAGE_IN))
 
-    rm -f "/tmp/${MAC}_$$.tmp"
+#    rm -f "/tmp/${MAC}_$$.tmp"
     
     echo $MAC >> /tmp/updated_$$.tmp
 
@@ -251,20 +251,19 @@ case $1 in
 	fi
 	
         grep -vi '^IP\|0x0' /proc/net/arp > /tmp/arp_$$.tmp 
-	while read IP TYPE FLAGS MAC MASK IFACE
+	while read IP _ _ MAC _ IFACE
 	do
 	    IN=0
 	    OUT=0
 	    #Add new data to the graph.
-	    chain=FORWARD
-	    grep $IP /tmp/traffic_${chain}_$$.tmp > /tmp/${IP}_${chain}_$$.tmp
+	    grep $IP /tmp/traffic_FORWARD_$$.tmp > /tmp/${IP}_FORWARD_$$.tmp
 	    while read _ BYTES _ _ _ IFIN IFOUT SRC DST
 	    do
 		#!@todo OUT and IN used here refer to the IP's perspective, not ours
 		[ "$DST" = "$IP" ] && IN=$((IN + BYTES))
 		[ "$SRC" = "$IP" ] && OUT=$((OUT + BYTES))
-	    done < /tmp/${IP}_${chain}_$$.tmp
-	    rm -f /tmp/${IP}_${chain}_$$.tmp
+	    done < /tmp/${IP}_FORWARD_$$.tmp
+	    #rm -f /tmp/${IP}_FORWARD_$$.tmp
 	    
 	    if [ "${IN}" -gt 0 -o "${OUT}" -gt 0 ]; then
 		updatedb $MAC $IP $IFACE $IN $OUT $DB
@@ -325,13 +324,11 @@ case $1 in
 	    newChain $chain
 	done
 
-	chain=FORWARD
-
 	#For each host in the ARP table
         grep -vi '^IP\|0x0' /proc/net/arp > /tmp/arp_$$.tmp 
 	while read IP TYPE FLAGS MAC MASK IFACE
 	do
-	    newRule $chain $IP
+	    newRule FORWARD $IP
 	done < /tmp/arp_$$.tmp
 	
 	#lan=$(detectLAN)
