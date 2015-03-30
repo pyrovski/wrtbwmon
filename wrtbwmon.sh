@@ -31,7 +31,7 @@ DEBUG=1
 tun=tun0
 DB=$2
 
-header="#mac,ip,iface,peak_in,peak_out,offpeak_in,offpeak_out,first_date,last_date"
+header="#mac,ip,iface,peak_in,peak_out,offpeak_in,offpeak_out,total,first_date,last_date"
 
 detectIF()
 {
@@ -187,8 +187,8 @@ updatedb()
 	
 	#!@todo get hostname with: nslookup $IP | grep "$IP " | cut -d' ' -f4
     else
-	echo $LINE | cut -s -d, -f4-8 > "/tmp/${MAC}_$$.tmp"
-	IFS=, read PEAKUSAGE_IN PEAKUSAGE_OUT OFFPEAKUSAGE_IN OFFPEAKUSAGE_OUT firstDate < "/tmp/${MAC}_$$.tmp"
+	echo $LINE | cut -s -d, -f4-9 > "/tmp/${MAC}_$$.tmp"
+	IFS=, read PEAKUSAGE_IN PEAKUSAGE_OUT OFFPEAKUSAGE_IN OFFPEAKUSAGE_OUT TOTAL firstDate < "/tmp/${MAC}_$$.tmp"
     fi
     
     if [ "${3}" = "offpeak" ]; then
@@ -202,6 +202,7 @@ updatedb()
 	PEAKUSAGE_IN=$((PEAKUSAGE_IN + IN))
 	PEAKUSAGE_OUT=$((PEAKUSAGE_OUT + OUT))
     fi
+    TOTAL=$((OFFPEAKUSAGE_OUT + OFFPEAKUSAGE_IN + PEAKUSAGE_OUT + PEAKUSAGE_IN))
 
     rm -f "/tmp/${MAC}_$$.tmp"
     
@@ -211,38 +212,22 @@ updatedb()
     trap "" SIGINT
     mv /tmp/db_$$.tmp $DB
 
-    echo $MAC,$IP,$IFACE,$PEAKUSAGE_IN,$PEAKUSAGE_OUT,$OFFPEAKUSAGE_IN,$OFFPEAKUSAGE_OUT,$firstDate,$(dateFormat) >> $DB
+    echo $MAC,$IP,$IFACE,$PEAKUSAGE_IN,$PEAKUSAGE_OUT,$OFFPEAKUSAGE_IN,$OFFPEAKUSAGE_OUT,$TOTAL,$firstDate,$(dateFormat) >> $DB
     trap "unlock; exit 1" SIGINT
 }
 
 ############################################################
 
-#echo 'INPUT filter
-#OUTPUT filter
-#FORWARD mangle' > /tmp/tables
-
-#!@todo distinguish WAN<->LAN traffic from LAN<->LAN traffic.
-# This can be accomplished by setting src IP != our LAN IP in the rules.
-
-# Track forwarded data over the WAN interface via the FORWARD chain,
-# and locally generated data over the WAN via the INPUT and OUTPUT
-# chains. The old wrtbwmon script used interface filtering to get LAN
-# IPs, and only monitored the FORWARD chain. If the host running
-# wrtbwmon is also generating traffic, we should count that,
-# too. Restricting measurement to the WAN interface also provides
-# compatibility for setups that route traffic between wired and
-# wireless networks.
-
 case $1 in
     "setup" )
 	for chain in $chains; do
 	    newChain $chain
-	done # for all chains
+	done
 
 	chain=FORWARD
 
 	#For each host in the ARP table
-        cat /proc/net/arp | tail -n +2 | \
+        grep -vi 0x0 /proc/net/arp | tail -n +2 | \
 	    while read IP TYPE FLAGS MAC MASK IFACE
 	    do
 		newRule $chain $IP
@@ -284,23 +269,44 @@ case $1 in
 	    IN=0
 	    OUT=0
 	    for chain in $chains; do
-		grep " $tun " /tmp/traffic_${chain}_$$.tmp > /tmp/${tun}_${chain}_$$.tmp
-		read PKTS BYTES TARGET PROT OPT IFIN IFOUT SRC DST < /tmp/${tun}_${chain}_$$.tmp
-		[ "$chain" = "OUTPUT" -o "$chain" = "FORWARD" ] && [ "$IFOUT" = "$tun" ] && OUT=$((OUT + BYTES))
-		[ "$chain" = "INPUT" -o "$chain" = "FORWARD" ] && [ "$IFIN" = "$tun" ] && IN=$((IN + BYTES))
+		grep " $tun " /tmp/traffic_${chain}_$$.tmp > \
+		     /tmp/${tun}_${chain}_$$.tmp
+		read PKTS BYTES TARGET PROT OPT IFIN IFOUT SRC DST < \
+		     /tmp/${tun}_${chain}_$$.tmp
+		[ "$chain" = "OUTPUT" -o "$chain" = "FORWARD" ] && \
+		    [ "$IFOUT" = "$tun" ] && \
+		    OUT=$((OUT + BYTES))
+		[ "$chain" = "INPUT" -o "$chain" = "FORWARD" ] && \
+		    [ "$IFIN" = "$tun" ] && \
+		    IN=$((IN + BYTES))
 		rm -f /tmp/${tun}_${chain}_$$.tmp
 	    done
-	    if [ "$IN" -gt 0 -o "$OUT" -gt 0 ]; then
+	    [ "${IN}" -gt 0 -o "${OUT}" -gt 0 ] && \
 		updatedb "($tun)" NA $tun $IN $OUT $DB
-	    fi
 	fi
 
 	wan=$(detectWAN)
 	if [ -n "$wan" ]; then
-	    updatedb "(WAN)" NA $wan $IN $OUT $DB
+	    # read WAN data
+	    IN=0
+	    OUT=0
+
+	    IF=$wan
+	    for chain in INPUT OUTPUT; do
+		grep " $IF " /tmp/traffic_${chain}_$$.tmp > \
+		     /tmp/${IF}_${chain}_$$.tmp
+		read PKTS BYTES TARGET PROT OPT IFIN IFOUT SRC DST < \
+		     /tmp/${IF}_${chain}_$$.tmp
+		[ "$chain" = "OUTPUT" ] && [ "$IFOUT" = "$IF" ] && OUT=$((OUT + BYTES))
+		[ "$chain" = "INPUT" ] && [ "$IFIN" = "$IF" ] && IN=$((IN + BYTES))
+		rm -f /tmp/${IF}_${chain}_$$.tmp
+	    done
+	    
+	    [ "${IN}" -gt 0 -o "${OUT}" -gt 0 ] && \
+		updatedb "(WAN)" NA $wan $IN $OUT $DB
 	fi
 	
-        tail -n +2 /proc/net/arp  | \
+        grep -vi 0x0 /proc/net/arp | tail -n +2 | \
 	    while read IP TYPE FLAGS MAC MASK IFACE
 	    do
 		IN=0
@@ -345,7 +351,7 @@ case $1 in
 
         # create HTML page
 	awk '/^#cut here 1/{flag=1;next}/^#cut here 2/{flag=0}flag'< $0 > ${3}
-	while IFS=, read PEAKUSAGE_IN MAC IP IFACE PEAKUSAGE_OUT OFFPEAKUSAGE_IN OFFPEAKUSAGE_OUT FIRSTSEEN LASTSEEN
+	while IFS=, read PEAKUSAGE_IN MAC IP IFACE PEAKUSAGE_OUT OFFPEAKUSAGE_IN OFFPEAKUSAGE_OUT TOTAL FIRSTSEEN LASTSEEN
 	do
 	    echo "new Array(" >> ${3}
 	    case $USERSFILE in
@@ -357,7 +363,7 @@ case $1 in
 		    ;;
 	    esac
 	    [ -z "$USER" ] && USER=${MAC}
-	    echo "\"${USER}\",${PEAKUSAGE_IN},${PEAKUSAGE_OUT},${OFFPEAKUSAGE_IN},${OFFPEAKUSAGE_OUT},\"$FIRSTSEEN\",\"${LASTSEEN}\")," >> ${3}
+	    echo "\"$USER\",$PEAKUSAGE_IN,$PEAKUSAGE_OUT,$OFFPEAKUSAGE_IN,$OFFPEAKUSAGE_OUT,$TOTAL,\"$FIRSTSEEN\",\"$LASTSEEN\")," >> ${3}
 	done < /tmp/sorted_$$.tmp
 	echo "0);" >> ${3}
 	
@@ -411,6 +417,7 @@ function getSize(size) {
 <th>Peak upload</th>
 <th>Offpeak download</th>
 <th>Offpeak upload</th>
+<th>Total</th>
 <th>First seen</th>
 <th>Last seen</th>
 </tr>
@@ -422,16 +429,16 @@ for (i=0; i < values.length-1; i++) {
     document.write("<tr><td>");
     document.write(values[i][0]);
     document.write("</td>");
-    for (j=1; j < 5; j++) {
+    for (j=1; j < 6; j++) {
         document.write("<td>");
         document.write(getSize(values[i][j]));
         document.write("</td>");
     }
     document.write("<td>");
-    document.write(values[i][5]);
+    document.write(values[i][7]);
     document.write("</td>");
     document.write("<td>");
-    document.write(values[i][6]);
+    document.write(values[i][8]);
     document.write("</td>");
     document.write("</tr>");
 }
