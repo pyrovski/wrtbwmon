@@ -11,3 +11,10 @@ so you can easily determine which user/device is the culprit.
 - Setup: `./wrtbwmon setup`
 - Update table: `./wrtbwmon update /tmp/usage.db` (you can place the data table anywhere)
 - Create html page (currently broken): `./wrtbwmon publish /tmp/usage.db /tmp/usage.htm`
+
+#### Regular updates
+- Install script to /usr/sbin:
+    ./install.sh
+- Add the following to root's crontab:
+    * * * * * /usr/sbin/wrtbwmon update /tmp/usage.db
+    0 * * * * /usr/sbin/wrtbwmon publish /tmp/usage.db /tmp/usage.htm
