@@ -57,9 +57,9 @@ detectLAN()
 
 detectWAN()
 {
+    [ -n "$WAN_IF" ] && echo $WAN_IF && return
     wan=$(detectIF wan)
     [ -n "$wan" ] && echo $wan && return
-    [ -n "$WAN_IF" ] && echo $WAN_IF && return
 }
 
 dateFormat()
@@ -88,28 +88,20 @@ unlock()
 newChain()
 {
     chain=$1
-    table=$(getTable $chain)
 
     #Create the RRDIPT_$chain chain (it doesn't matter if it already exists).
-    iptables -t $table -N RRDIPT_$chain 2> /dev/null
+    iptables -t mangle -N RRDIPT_$chain 2> /dev/null
     
     #Add the RRDIPT_$chain CHAIN to the $chain chain (if non existing).
-    iptables -t $table -L $chain --line-numbers -n | grep "RRDIPT_$chain" > /dev/null
+    iptables -t mangle -L $chain --line-numbers -n | grep "RRDIPT_$chain" > /dev/null
     if [ $? -ne 0 ]; then
-	iptables -t $table -L $chain -n | grep "RRDIPT_$chain" > /dev/null
+	iptables -t mangle -L $chain -n | grep "RRDIPT_$chain" > /dev/null
 	if [ $? -eq 0 ]; then
 	    [ -n "$DEBUG" ] && echo "DEBUG: iptables chain misplaced, recreating it..."
-	    iptables -t $table -D $chain -j RRDIPT_$chain
+	    iptables -t mangle -D $chain -j RRDIPT_$chain
 	fi
-	iptables -t $table -I $chain -j RRDIPT_$chain
+	iptables -t mangle -I $chain -j RRDIPT_$chain
     fi
-}
-
-# chain
-getTable()
-{
-    #grep "^$1 " /tmp/tables | cut -d' ' -f2
-    echo mangle
 }
 
 # chain tun
@@ -117,17 +109,16 @@ newRuleIF()
 {
     chain=$1
     IF=$2
-    table=$(getTable $chain)
     
-    iptables -t $table -nvL RRDIPT_$chain | grep " $IF " > /dev/null
+    iptables -t mangle -nvL RRDIPT_$chain | grep " $IF " > /dev/null
     if [ "$?" -ne 0 ]; then
 	if [ "$chain" = "OUTPUT" ]; then
-	    iptables -t $table -A RRDIPT_$chain -o $IF -j RETURN
+	    iptables -t mangle -A RRDIPT_$chain -o $IF -j RETURN
 	elif [ "$chain" = "INPUT" ]; then
-	    iptables -t $table -A RRDIPT_$chain -i $IF -j RETURN
+	    iptables -t mangle -A RRDIPT_$chain -i $IF -j RETURN
 	fi
     elif [ -n "$DEBUG" ]; then
-	echo "DEBUG: table $table chain $chain rule $IF already exists?"
+	echo "DEBUG: table mangle chain $chain rule $IF already exists?"
     fi
 }
 
@@ -136,16 +127,15 @@ newRule()
 {
     chain=$1
     IP=$2
-    table=$(getTable $chain)
 
     #Add iptable rules (if non existing).
-    iptables -t $table -nL RRDIPT_$chain | grep "$IP " > /dev/null
+    iptables -t mangle -nL RRDIPT_$chain | grep "$IP " > /dev/null
     if [ $? -ne 0 ]; then
 	if [ "$chain" = "OUTPUT" -o "$chain" = "FORWARD" ]; then
-	    iptables -t $table -I RRDIPT_$chain -d $IP -j RETURN
+	    iptables -t mangle -I RRDIPT_$chain -d $IP -j RETURN
 	fi
 	if [ "$chain" = "INPUT" -o "$chain" = "FORWARD" ]; then
-	    iptables -t $table -I RRDIPT_$chain -s $IP -j RETURN
+	    iptables -t mangle -I RRDIPT_$chain -s $IP -j RETURN
 	fi
     fi
 }
@@ -220,49 +210,14 @@ updatedb()
 
     rm -f "/tmp/${MAC}_$$.tmp"
     
-    #!@todo combine updates
-    grep -v "^$MAC" $DB > /tmp/db_$$.tmp
+    echo $MAC >> /tmp/updated_$$.tmp
 
-    trap "" SIGINT
-    mv /tmp/db_$$.tmp $DB
-
-    echo $MAC,$IP,$IFACE,$PEAKUSAGE_IN,$PEAKUSAGE_OUT,$OFFPEAKUSAGE_IN,$OFFPEAKUSAGE_OUT,$TOTAL,$firstDate,$(dateFormat) >> $DB
-    trap "unlock; exit 1" SIGINT
+    echo $MAC,$IP,$IFACE,$PEAKUSAGE_IN,$PEAKUSAGE_OUT,$OFFPEAKUSAGE_IN,$OFFPEAKUSAGE_OUT,$TOTAL,$firstDate,$(dateFormat) >> /tmp/db_$$.tmp
 }
 
 ############################################################
 
 case $1 in
-    "setup" )
-	for chain in $chains; do
-	    newChain $chain
-	done
-	
-	#For each host in the ARP table
-        grep -vi 0x0 /proc/net/arp | tail -n +2 | \
-	    while read IP TYPE FLAGS MAC MASK IFACE
-	    do
-		newRule FORWARD $IP
-	    done	
-
-	lan=$(detectLAN)
-	wan=$(detectWAN)
-	if [ -n "$wan" ]; then
-	    wanIP=`ifconfig $wan | grep -o 'inet addr:[0-9.]\+' | cut -d':' -f2`
-	else
-	    echo "Warning: failed to detect WAN interface."
-	fi
-	
-	# track local data
-	for chain in INPUT OUTPUT; do
-	    [ -n "$wan" ] && newRuleIF $chain $wan
-	    #!@todo automate this;
-	    # can detect gateway IPs: route -n | grep '^[0-9]' | awk '{print $2}' | sort | uniq | grep -v 0.0.0.0
-	    [ -n "$tun" ] && newRuleIF $chain $tun
-	done
-	
-	;;
-    
     "update" )
 	[ -z "$DB" ] && echo "ERROR: Missing argument 2" && exit 1	
 	[ ! -f "$DB" ] && echo $header > "$DB"
@@ -272,8 +227,7 @@ case $1 in
 
 	#Read and reset counters
 	for chain in $chains; do
-	    table=$(getTable $chain)
-	    iptables -t $table -L RRDIPT_$chain -vnxZ > /tmp/traffic_${chain}_$$.tmp
+	    iptables -t mangle -L RRDIPT_$chain -vnxZ > /tmp/traffic_${chain}_$$.tmp
 	done
 
 	# read tun data
@@ -296,30 +250,34 @@ case $1 in
 		updatedb "(WAN)" NA $wan $IN $OUT $DB
 	fi
 	
-        grep -vi 0x0 /proc/net/arp | tail -n +2 | \
-	    while read IP TYPE FLAGS MAC MASK IFACE
+        grep -vi '^IP\|0x0' /proc/net/arp > /tmp/arp_$$.tmp 
+	while read IP TYPE FLAGS MAC MASK IFACE
+	do
+	    IN=0
+	    OUT=0
+	    #Add new data to the graph.
+	    chain=FORWARD
+	    grep $IP /tmp/traffic_${chain}_$$.tmp > /tmp/${IP}_${chain}_$$.tmp
+	    while read _ BYTES _ _ _ IFIN IFOUT SRC DST
 	    do
-		IN=0
-		OUT=0
-		#Add new data to the graph.
-		chain=FORWARD
-		grep $IP /tmp/traffic_${chain}_$$.tmp > /tmp/${IP}_${chain}_$$.tmp
-		while read PKTS BYTES TARGET PROT OPT IFIN IFOUT SRC DST
-		do
-		    #!@todo OUT and IN used here refer to the IP's perspective, not ours
-		    [ "$DST" = "$IP" ] && IN=$((IN + BYTES))
-		    [ "$SRC" = "$IP" ] && OUT=$((OUT + BYTES))
-		done < /tmp/${IP}_${chain}_$$.tmp
-		rm -f /tmp/${IP}_${chain}_$$.tmp
-		
-		if [ "${IN}" -gt 0 -o "${OUT}" -gt 0 ]; then
-		    updatedb $MAC $IP $IFACE $IN $OUT $DB
-		fi
-	    done
+		#!@todo OUT and IN used here refer to the IP's perspective, not ours
+		[ "$DST" = "$IP" ] && IN=$((IN + BYTES))
+		[ "$SRC" = "$IP" ] && OUT=$((OUT + BYTES))
+	    done < /tmp/${IP}_${chain}_$$.tmp
+	    rm -f /tmp/${IP}_${chain}_$$.tmp
+	    
+	    if [ "${IN}" -gt 0 -o "${OUT}" -gt 0 ]; then
+		updatedb $MAC $IP $IFACE $IN $OUT $DB
+	    fi
+	done < /tmp/arp_$$.tmp
 
-	#Free some memory
+	egrep -v `tr '\n' '|' < /tmp/updated_$$.tmp | sed 's/|$//'` $DB > /tmp/stale_$$.tmp
+	cat /tmp/stale_$$.tmp /tmp/db_$$.tmp > $DB
+
+        #Free some memory
 	rm -f /tmp/*_$$.tmp
 	unlock
+	exit
 	;;
     
     "publish" )
@@ -362,6 +320,37 @@ case $1 in
 	rm -f /tmp/*_$$.tmp
 	;;
     
+    "setup" )
+	for chain in $chains; do
+	    newChain $chain
+	done
+
+	chain=FORWARD
+
+	#For each host in the ARP table
+        grep -vi '^IP\|0x0' /proc/net/arp > /tmp/arp_$$.tmp 
+	while read IP TYPE FLAGS MAC MASK IFACE
+	do
+	    newRule $chain $IP
+	done < /tmp/arp_$$.tmp
+	
+	#lan=$(detectLAN)
+	wan=$(detectWAN)
+	if [ -z "$wan" ]; then
+	    echo "Warning: failed to detect WAN interface."
+	    #else wanIP=`ifconfig $wan | grep -o 'inet addr:[0-9.]\+' | cut -d':' -f2`
+	fi
+	
+	# track local data
+	for chain in INPUT OUTPUT; do
+	    [ -n "$wan" ] && newRuleIF $chain $wan
+	    #!@todo automate this;
+	    # can detect gateway IPs: route -n | grep '^[0-9]' | awk '{print $2}' | sort | uniq | grep -v 0.0.0.0
+	    [ -n "$tun" ] && newRuleIF $chain $tun
+	done
+	
+	;;
+
     "remove" )
 	iptables-save | grep -v RRDIPT | iptables-restore
 	;;
