@@ -17,5 +17,5 @@ so you can easily determine which user/device is the culprit.
     ./install.sh
 - Add the following to root's crontab:
 
-    * * * * * /usr/sbin/wrtbwmon update /tmp/usage.db
-    0 * * * * /usr/sbin/wrtbwmon publish /tmp/usage.db /tmp/usage.htm
+        * * * * * /usr/sbin/wrtbwmon update /tmp/usage.db
+        0 * * * * /usr/sbin/wrtbwmon publish /tmp/usage.db /tmp/usage.htm
