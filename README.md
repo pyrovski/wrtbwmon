@@ -1,6 +1,11 @@
 # wrtbwmon
 Modified from https://code.google.com/p/wrtbwmon/.
 
+## New features
+ - "First seen" and "Total" columns in usage table
+ - Monitoring of locally generated traffic on a per-interface basis
+ - `remove` function to delete `iptables` rules
+
 ### What does it do?
 `wrtbwmon` was designed to track bandwidth consumption on home routers. 
 It accomplishes this with `iptables` rules, which means you don't need to run an extra process just to track bandwidth. 
