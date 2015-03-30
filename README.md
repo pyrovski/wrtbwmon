@@ -25,3 +25,6 @@ so you can easily determine which user/device is the culprit.
 
         * * * * * /usr/sbin/wrtbwmon update /tmp/usage.db
         0 * * * * /usr/sbin/wrtbwmon publish /tmp/usage.db /tmp/usage.htm
+
+### Remove `iptables` rules
+ - `./wrtbwmon remove`
