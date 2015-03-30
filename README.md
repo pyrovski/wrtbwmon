@@ -10,4 +10,4 @@ so you can easily determine which user/device is the culprit.
 ### How do I use it?
 - Setup: `./wrtbwmon setup`
 - Update table: `./wrtbwmon update /tmp/usage.db` (you can place the data table anywhere)
-- Create html page (currently broken): `./wrtbwmon publish /tmp/usage.db /tmp/usage.htm`
+- Create html page: `./wrtbwmon publish /tmp/usage.db /tmp/usage.htm`
