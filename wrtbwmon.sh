@@ -352,7 +352,7 @@ case $1 in
 		    ;;
 	    esac
 	    [ -z "$USER" ] && USER=${MAC}
-	    echo "\"${USER}\",${PEAKUSAGE_IN},${PEAKUSAGE_OUT},${OFFPEAKUSAGE_IN},${OFFPEAKUSAGE_OUT},\"${LASTSEEN}\")," >> ${3}
+	    echo "\"${USER}\",${PEAKUSAGE_IN},${PEAKUSAGE_OUT},${OFFPEAKUSAGE_IN},${OFFPEAKUSAGE_OUT},\"$FIRSTSEEN\",\"${LASTSEEN}\")," >> ${3}
 	done < /tmp/sorted_$$.tmp
 	echo "0);" >> ${3}
 	
@@ -399,7 +399,16 @@ function getSize(size) {
     return (Math.round(size*precision)/precision)+' '+prefix[pos];}
 </script></head>
 <body><h1>Total Usage :</h1>
-<table border="1"><tr bgcolor=silver><th>User</th><th>Peak download</th><th>Peak upload</th><th>Offpeak download</th><th>Offpeak upload</th><th>Last seen</th></tr>
+<table border="1">
+<tr bgcolor=silver>
+<th>User</th>
+<th>Peak download</th>
+<th>Peak upload</th>
+<th>Offpeak download</th>
+<th>Offpeak upload</th>
+<th>First seen</th>
+<th>Last seen</th>
+</tr>
 <script type="text/javascript">
 var values = new Array(
 
@@ -415,6 +424,9 @@ for (i=0; i < values.length-1; i++) {
     }
     document.write("<td>");
     document.write(values[i][5]);
+    document.write("</td>");
+    document.write("<td>");
+    document.write(values[i][6]);
     document.write("</td>");
     document.write("</tr>");
 }
