@@ -237,14 +237,12 @@ case $1 in
 	for chain in $chains; do
 	    newChain $chain
 	done
-
-	chain=FORWARD
-
+	
 	#For each host in the ARP table
         grep -vi 0x0 /proc/net/arp | tail -n +2 | \
 	    while read IP TYPE FLAGS MAC MASK IFACE
 	    do
-		newRule $chain $IP
+		newRule FORWARD $IP
 	    done	
 
 	lan=$(detectLAN)
@@ -434,4 +432,3 @@ for (i=0; i < values.length-1; i++) {
 </script></table>
 <br /><small>This page was generated on (date)</small>
 </body></html>
-
