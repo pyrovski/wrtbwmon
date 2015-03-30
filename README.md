@@ -13,8 +13,8 @@ so you can easily determine which user/device is the culprit.
 - Create html page: `./wrtbwmon publish /tmp/usage.db /tmp/usage.htm`
 
 ### Regular updates
-- Install script to /usr/sbin:
-- 
+ - Install script to /usr/sbin:
+ - 
         ./install.sh
 
   or
