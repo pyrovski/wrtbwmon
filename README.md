@@ -14,7 +14,13 @@ so you can easily determine which user/device is the culprit.
 
 #### Regular updates
 - Install script to /usr/sbin:
-    ./install.sh
+- 
+        ./install.sh
+
+  or
+  
+        wget -O /usr/sbin/wrtbwmon https://raw.githubusercontent.com/pyrovski/wrtbwmon/master/wrtbwmon.sh
+        
 - Add the following to root's crontab:
 
         * * * * * /usr/sbin/wrtbwmon update /tmp/usage.db
