@@ -12,7 +12,7 @@ so you can easily determine which user/device is the culprit.
 - Update table: `./wrtbwmon update /tmp/usage.db` (you can place the data table anywhere)
 - Create html page: `./wrtbwmon publish /tmp/usage.db /tmp/usage.htm`
 
-#### Regular updates
+### Regular updates
 - Install script to /usr/sbin:
 - 
         ./install.sh
