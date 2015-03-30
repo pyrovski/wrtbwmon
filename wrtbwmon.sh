@@ -403,7 +403,7 @@ function getSize(size) {
     if (pos > 2) precision=1000; else precision = 1;
     return (Math.round(size*precision)/precision)+' '+prefix[pos];}
 </script></head>
-<body><h1>Total Usage :</h1>
+<body><h1>Total Usage:</h1>
 <table border="1">
 <tr bgcolor=silver>
 <th>User</th>
