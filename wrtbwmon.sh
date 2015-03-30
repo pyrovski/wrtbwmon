@@ -339,52 +339,24 @@ case $1 in
 	unlock
 
         # create HTML page
-	rm -f "$3"
-        echo "<html><head><title>Traffic</title>
-<script src="http://code.jquery.com/jquery-1.8.2.js"></script>
-<script src="http://jquery-csv.googlecode.com/git/src/jquery.csv.js"></script>
-<script type=\"text/javascript\">
-function getSize(size) {
-    var prefix=new Array(\"\",\"k\",\"M\",\"G\",\"T\",\"P\",\"E\",\"Z\"); var base=1000;
-    var pos=0;
-    while (size>base) {
-        size/=base; pos++;
-    }
-    if (pos > 2) precision=1000; else precision = 1;
-    return (Math.round(size*precision)/precision)+' '+prefix[pos];}
-</script></head>
-<body><h1>Total Usage :</h1>
-<table border="1"><tr bgcolor=silver><th>User</th><th>Peak download</th><th>Peak upload</th><th>Offpeak download</th><th>Offpeak upload</th><th>Last seen</th></tr>" >> ${3}
-	echo "<script type=\"text/javascript\">
-var values = new Array(" >> ${3}
+	awk '/^#cut here 1/{flag=1;next}/^#cut here 2/{flag=0}flag'< $0 > ${3}
 	while IFS=, read PEAKUSAGE_IN MAC IP IFACE PEAKUSAGE_OUT OFFPEAKUSAGE_IN OFFPEAKUSAGE_OUT FIRSTSEEN LASTSEEN
 	do
 	    echo "new Array(" >> ${3}
-	    USER=$(grep "${MAC}" "${USERSFILE}" | cut -f2 -s -d, )
+	    case $USERSFILE in
+		"/tmp/dhcp.leases" )
+		    USER=$(grep "$MAC" "$USERSFILE" | cut -f4 -s -d' ' )
+		    ;;
+		* )
+		    USER=$(grep "$MAC" "$USERSFILE" | cut -f2 -s -d, )
+		    ;;
+	    esac
 	    [ -z "$USER" ] && USER=${MAC}
-	    echo "\"${USER}\",${PEAKUSAGE_IN},${PEAKUSAGE_OUT},${OFFPEAKUSAGE_IN},${OFFPEAKUSAGE_OUT},\"${LASTSEEN}\")," | tee -a ${3}
+	    echo "\"${USER}\",${PEAKUSAGE_IN},${PEAKUSAGE_OUT},${OFFPEAKUSAGE_IN},${OFFPEAKUSAGE_OUT},\"${LASTSEEN}\")," >> ${3}
 	done < /tmp/sorted_$$.tmp
 	echo "0);" >> ${3}
 	
-	echo "
-for (i=0; i < values.length-1; i++) {
-    document.write(\"<tr><td>\");
-    document.write(values[i][0]);
-    document.write(\"</td>\");
-    for (j=1; j < 5; j++) {
-        document.write(\"<td>\");
-        document.write(getSize(values[i][j]));
-        document.write(\"</td>\");
-    }
-    document.write(\"<td>\");
-    document.write(values[i][5]);
-    document.write(\"</td>\");
-    document.write(\"</tr>\");
-}
-</script></table>" >> ${3}
-	echo "
-<br /><small>This page was generated on `date`</small>
-</body></html>" >> ${3}
+	awk 'f;/^#cut here 2/{f=1}' < $0 | sed "s/(date)/`date`/" >> $3
 	
 	#Free some memory
 	rm -f /tmp/*_$$.tmp
@@ -407,7 +379,46 @@ for (i=0; i < values.length-1; i++) {
 	echo "   $0 remove"
 	echo "Note: [user_file] is an optional file to match users with their MAC address"
 	echo "       Its format is: 00:MA:CA:DD:RE:SS,username , with one entry per line"
-	exit
 	;;
 esac
+
+exit
+
+#cut here 1#
+<html><head><title>Traffic</title>
+<script src="http://code.jquery.com/jquery-1.8.2.js"></script>
+<script src="http://jquery-csv.googlecode.com/git/src/jquery.csv.js"></script>
+<script type="text/javascript">
+function getSize(size) {
+    var prefix=new Array("","k","M","G","T","P","E","Z"); var base=1000;
+    var pos=0;
+    while (size>base) {
+        size/=base; pos++;
+    }
+    if (pos > 2) precision=1000; else precision = 1;
+    return (Math.round(size*precision)/precision)+' '+prefix[pos];}
+</script></head>
+<body><h1>Total Usage :</h1>
+<table border="1"><tr bgcolor=silver><th>User</th><th>Peak download</th><th>Peak upload</th><th>Offpeak download</th><th>Offpeak upload</th><th>Last seen</th></tr>
+<script type="text/javascript">
+var values = new Array(
+
+#cut here 2#    
+for (i=0; i < values.length-1; i++) {
+    document.write("<tr><td>");
+    document.write(values[i][0]);
+    document.write("</td>");
+    for (j=1; j < 5; j++) {
+        document.write("<td>");
+        document.write(getSize(values[i][j]));
+        document.write("</td>");
+    }
+    document.write("<td>");
+    document.write(values[i][5]);
+    document.write("</td>");
+    document.write("</tr>");
+}
+</script></table>
+<br /><small>This page was generated on (date)</small>
+</body></html>
 
