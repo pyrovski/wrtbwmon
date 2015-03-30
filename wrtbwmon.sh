@@ -294,6 +294,11 @@ case $1 in
 		updatedb "($tun)" NA $tun $IN $OUT $DB
 	    fi
 	fi
+
+	wan=$(detectWAN)
+	if [ -n "$wan" ]; then
+	    updatedb "(WAN)" NA $wan $IN $OUT $DB
+	fi
 	
         tail -n +2 /proc/net/arp  | \
 	    while read IP TYPE FLAGS MAC MASK IFACE
