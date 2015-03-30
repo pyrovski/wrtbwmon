@@ -150,6 +150,23 @@ newRule()
     fi
 }
 
+# interface
+readIF()
+{
+    IF=$1
+    for chain in INPUT OUTPUT; do
+	grep " $IF " /tmp/traffic_${chain}_$$.tmp > \
+	     /tmp/${IF}_${chain}_$$.tmp
+	read PKTS BYTES TARGET PROT OPT IFIN IFOUT SRC DST < \
+	     /tmp/${IF}_${chain}_$$.tmp
+	[ "$chain" = "OUTPUT" ] && [ "$IFOUT" = "$IF" ] && \
+	    OUT=$((OUT + BYTES))
+	[ "$chain" = "INPUT" ] && [ "$IFIN" = "$IF" ] && \
+	    IN=$((IN + BYTES))
+	rm -f /tmp/${IF}_${chain}_$$.tmp
+    done
+    echo "$IN $OUT"
+}
 
 # MAC IP IFACE IN OUT DB
 updatedb()
@@ -168,15 +185,12 @@ updatedb()
 	[ -n "$DEBUG" ] && echo "DEBUG: $MAC/$IP is a new host !"
 
 	# add rules for new host
-	for chain in $chains; do
-	    if [ "$IP" = "NA" ]; then
-		if [ -n "$tun" ]; then
-		    newRuleIF $chain $tun
-		fi
-	    else
-		newRule $chain $IP
-	    fi
-	done
+	if [ -n "$tun" -a "$IP" = "NA" ]; then
+	    for chain in INPUT OUTPUT; do
+		newRuleIF $chain $tun
+	    done
+	fi
+	newRule FORWARD $IP
 	
 	PEAKUSAGE_IN=0
 	PEAKUSAGE_OUT=0
@@ -266,41 +280,19 @@ case $1 in
 
 	# read tun data
 	if [ -n "$tun" ]; then
-	    IN=0
-	    OUT=0
-	    for chain in $chains; do
-		grep " $tun " /tmp/traffic_${chain}_$$.tmp > \
-		     /tmp/${tun}_${chain}_$$.tmp
-		read PKTS BYTES TARGET PROT OPT IFIN IFOUT SRC DST < \
-		     /tmp/${tun}_${chain}_$$.tmp
-		[ "$chain" = "OUTPUT" -o "$chain" = "FORWARD" ] && \
-		    [ "$IFOUT" = "$tun" ] && \
-		    OUT=$((OUT + BYTES))
-		[ "$chain" = "INPUT" -o "$chain" = "FORWARD" ] && \
-		    [ "$IFIN" = "$tun" ] && \
-		    IN=$((IN + BYTES))
-		rm -f /tmp/${tun}_${chain}_$$.tmp
-	    done
-	    [ "${IN}" -gt 0 -o "${OUT}" -gt 0 ] && \
+	    IN_OUT=`readIF $tun`
+	    IN=`echo $IN_OUT | cut -d' ' -f1`
+	    OUT=`echo $IN_OUT | cut -d' ' -f2`
+	    [ "$IN" -gt 0 -o "$OUT" -gt 0 ] && \
 		updatedb "($tun)" NA $tun $IN $OUT $DB
 	fi
 
 	wan=$(detectWAN)
 	if [ -n "$wan" ]; then
 	    # read WAN data
-	    IN=0
-	    OUT=0
-
-	    IF=$wan
-	    for chain in INPUT OUTPUT; do
-		grep " $IF " /tmp/traffic_${chain}_$$.tmp > \
-		     /tmp/${IF}_${chain}_$$.tmp
-		read PKTS BYTES TARGET PROT OPT IFIN IFOUT SRC DST < \
-		     /tmp/${IF}_${chain}_$$.tmp
-		[ "$chain" = "OUTPUT" ] && [ "$IFOUT" = "$IF" ] && OUT=$((OUT + BYTES))
-		[ "$chain" = "INPUT" ] && [ "$IFIN" = "$IF" ] && IN=$((IN + BYTES))
-		rm -f /tmp/${IF}_${chain}_$$.tmp
-	    done
+	    IN_OUT=$(readIF $wan)
+	    IN=`echo $IN_OUT | cut -d' ' -f1`
+	    OUT=`echo $IN_OUT | cut -d' ' -f2`
 	    
 	    [ "${IN}" -gt 0 -o "${OUT}" -gt 0 ] && \
 		updatedb "(WAN)" NA $wan $IN $OUT $DB
@@ -312,16 +304,15 @@ case $1 in
 		IN=0
 		OUT=0
 		#Add new data to the graph.
-		for chain in $chains; do
-		    grep $IP /tmp/traffic_${chain}_$$.tmp > /tmp/${IP}_${chain}_$$.tmp
-		    while read PKTS BYTES TARGET PROT OPT IFIN IFOUT SRC DST
-		    do
-			#!@todo OUT and IN used here refer to the IP's perspective, not ours
-			[ "$chain" = "OUTPUT" -o "$chain" = "FORWARD" ] && [ "$DST" = "$IP" ] && IN=$((IN + BYTES))
-			[ "$chain" = "INPUT" -o "$chain" = "FORWARD" ] && [ "$SRC" = "$IP" ] && OUT=$((OUT + BYTES))
-		    done < /tmp/${IP}_${chain}_$$.tmp
-		    rm -f /tmp/${IP}_${chain}_$$.tmp
-		done
+		chain=FORWARD
+		grep $IP /tmp/traffic_${chain}_$$.tmp > /tmp/${IP}_${chain}_$$.tmp
+		while read PKTS BYTES TARGET PROT OPT IFIN IFOUT SRC DST
+		do
+		    #!@todo OUT and IN used here refer to the IP's perspective, not ours
+		    [ "$DST" = "$IP" ] && IN=$((IN + BYTES))
+		    [ "$SRC" = "$IP" ] && OUT=$((OUT + BYTES))
+		done < /tmp/${IP}_${chain}_$$.tmp
+		rm -f /tmp/${IP}_${chain}_$$.tmp
 		
 		if [ "${IN}" -gt 0 -o "${OUT}" -gt 0 ]; then
 		    updatedb $MAC $IP $IFACE $IN $OUT $DB
@@ -397,8 +388,6 @@ exit
 
 #cut here 1#
 <html><head><title>Traffic</title>
-<script src="http://code.jquery.com/jquery-1.8.2.js"></script>
-<script src="http://jquery-csv.googlecode.com/git/src/jquery.csv.js"></script>
 <script type="text/javascript">
 function getSize(size) {
     var prefix=new Array("","k","M","G","T","P","E","Z"); var base=1000;
