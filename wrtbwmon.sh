@@ -22,7 +22,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-#set -x
+#!@todo add logger
 
 trap "unlock; exit 1" SIGINT
 
@@ -435,10 +435,10 @@ for (i=0; i < values.length-1; i++) {
         document.write("</td>");
     }
     document.write("<td>");
-    document.write(values[i][7]);
+    document.write(values[i][6]);
     document.write("</td>");
     document.write("<td>");
-    document.write(values[i][8]);
+    document.write(values[i][7]);
     document.write("</td>");
     document.write("</tr>");
 }
