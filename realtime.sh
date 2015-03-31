@@ -9,6 +9,7 @@ function newFile(n){
   return(sprintf("realtime.%06d.log", n))
 }
 function date(){
+#! this does not work with busybox date
   "date +%s.%N" | getline d
   close("date +%s.%N")
 #!@todo could start a process with "while true; do date +%s.%N; done"
@@ -28,7 +29,7 @@ BEGIN {
     printf "%f ", pd > f
   }
   d=date()
-  printf "%1.3f/%d ", d-pd, b-pb > f
+  printf "%1.2f/%d ", d-pd, b-pb > f
   fflush(f)
   pb=b
   pd=d
