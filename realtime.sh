@@ -1,7 +1,7 @@
 #!/bin/sh
 
-rm -f realtime.*.log
-
+period=$1
+[ -n "$period" ] || period=10
 while true; do
     sudo iptables -nvxL RRDIPT_INPUT -t mangle | grep ' eth0 '
 done | awk '
@@ -16,21 +16,20 @@ function date(){
   return(d)
 }
 BEGIN {
-  i=j=pb=0
-  f=newFile(i)
+  pb=0
   pd=date()
+  md=pd
+  printf "%1.2f/0 ", pd
 }
 {
   b=$2
-  if(++j >= 1000){
-    j=0
-    close(f)
-    f=newFile(++i)
-    printf "%f ", pd > f
+   if(pd-md >= '"$period"'){
+    printf "\n%1.2f/0 ", pd
+    md=pd
   }
   d=date()
-  printf "%1.2f/%d ", d-pd, b-pb > f
-  fflush(f)
+  printf "%1.2f/%d ", d-pd, b-pb
+  fflush()
   pb=b
   pd=d
 }

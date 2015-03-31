@@ -1,33 +1,16 @@
 #!/bin/sh
 
-cat realtime.log | awk '\
+awk '\
 {
   split($1,a,"/");
   tmin=a[1];
-  for(i=s=0;i<=NF;i++){
+  t=tmin
+  s=0
+  for(i=2;i<=NF;i++){
     split($i,a,"/");
-    s+=a[2]
-    if(a[1]-tmin >= 10)
-      break
-  };
-  print a[1]-tmin,s
-  ORS=" "
-  for(i++;i<NF;i++)
-    print $i > "realtime.log."
-}'
-mv realtime.log. realtime.log
-
-exit
-
-cat realtime.log | awk '\
-{
-  split($1,a,"/");
-  tmin=a[1];
-  for(i=s=0;i<=NF;i++){
-    split($i,a,"/");
+    t+=a[1]
     s+=a[2]
   };
-  split($NF,a,"/");
-  tmax=a[1];
-  print tmax-tmin,s
+  printf "%10.2f %d\n", t, s
+  fflush()
 }'
