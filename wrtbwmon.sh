@@ -33,6 +33,30 @@ DB=$2
 
 header="#mac,ip,iface,peak_in,peak_out,offpeak_in,offpeak_out,total,first_date,last_date"
 
+lookup()
+{
+    MAC=$1
+    IP=$2
+    userDB=$3
+    for USERSFILE in $userDB /tmp/dhcp.leases /tmp/dnsmasq.conf /etc/dnsmasq.conf /etc/hosts; do
+	[ ! -e "$USERSFILE" ] && continue
+	case $USERSFILE in
+	    /tmp/dhcp.leases )
+		USER=$(grep "$MAC" $USERSFILE | cut -f4 -s -d' ')
+		;;
+	    /etc/hosts )
+		USER=$(grep "^$IP " $USERSFILE | cut -f2 -s -d' ')
+		;;
+	    * )
+		USER=$(grep "$MAC" "$USERSFILE" | cut -f2 -s -d,)
+		;;
+	esac
+	[ -n "$USER" ] && break
+    done
+    [ -z "$USER" ] && USER=${MAC}
+    echo $USER
+}
+
 detectIF()
 {
     uci=`which uci 2>/dev/null`
@@ -69,19 +93,27 @@ dateFormat()
 
 lock()
 {
-    while [ -f /tmp/wrtbwmon.lock ]; do
-	if [ ! -d /proc/$(cat /tmp/wrtbwmon.lock) ]; then
-	    echo "WARNING: Lockfile detected but process $(cat /tmp/wrtbwmon.lock) does not exist !"
-	    rm -f /tmp/wrtbwmon.lock
-	fi
-	sleep 1
+    attempts=0
+    while [ $attempts -lt 10 ]; do
+	while [ -f /tmp/wrtbwmon.lock ]; do
+	    if [ ! -d /proc/$(< /tmp/wrtbwmon.lock) ]; then
+		echo "WARNING: Lockfile detected but process $(cat /tmp/wrtbwmon.lock) does not exist !"
+		rm -f /tmp/wrtbwmon.lock
+	    fi
+	    sleep 1
+	done
+	echo $$ > /tmp/wrtbwmon.lock
+	read lockPID < /tmp/wrtbwmon.lock
+	[[ $$ -eq "$lockPID" ]] && break;
+	attempts=$((attempts+1))
     done
-    echo $$ > /tmp/wrtbwmon.lock
+#    [[ -n "$DEBUG" ]] && echo $$ "got lock"
 }
 
 unlock()
 {
     rm -f /tmp/wrtbwmon.lock
+#    [[ -n "$DEBUG" ]] && echo $$ "released lock"
 }
 
 # chain
@@ -284,12 +316,6 @@ case $1 in
 	[ -z "$DB" ] && echo "ERROR: Missing database argument" && exit 1
 	[ -z "$3" ] && echo "ERROR: Missing argument 3" && exit 1
 	
-	USERSFILE=/tmp/dhcp.leases
-	#/etc/dnsmasq.conf
-	[ -f "$USERSFILE" ] || USERSFILE=/tmp/dnsmasq.conf
-	[ -z "$4" ] || USERSFILE=$4
-	[ -f "$USERSFILE" ] || USERSFILE=/dev/null
-
 	# first do some number crunching - rewrite the database so that it is sorted
 	lock
 	grep -v '^#' $DB | awk -F, '{OFS=","; a=$4; $4=""; print a OFS $0}' | tr -s ',' | sort -rn > /tmp/sorted_$$.tmp
@@ -299,17 +325,9 @@ case $1 in
 	awk '/^#cut here 1/{flag=1;next}/^#cut here 2/{flag=0}flag'< $0 > ${3}
 	while IFS=, read PEAKUSAGE_IN MAC IP IFACE PEAKUSAGE_OUT OFFPEAKUSAGE_IN OFFPEAKUSAGE_OUT TOTAL FIRSTSEEN LASTSEEN
 	do
-	    echo "new Array(" >> ${3}
-	    case $USERSFILE in
-		"/tmp/dhcp.leases" )
-		    USER=$(grep "$MAC" "$USERSFILE" | cut -f4 -s -d' ' )
-		    ;;
-		* )
-		    USER=$(grep "$MAC" "$USERSFILE" | cut -f2 -s -d, )
-		    ;;
-	    esac
-	    [ -z "$USER" ] && USER=${MAC}
-	    echo "\"$USER\",$PEAKUSAGE_IN,$PEAKUSAGE_OUT,$OFFPEAKUSAGE_IN,$OFFPEAKUSAGE_OUT,$TOTAL,\"$FIRSTSEEN\",\"$LASTSEEN\")," >> ${3}
+	    echo "
+new Array(\"$(lookup $MAC $IP $4)\",
+$PEAKUSAGE_IN,$PEAKUSAGE_OUT,$OFFPEAKUSAGE_IN,$OFFPEAKUSAGE_OUT,$TOTAL,\"$FIRSTSEEN\",\"$LASTSEEN\")," >> ${3}
 	done < /tmp/sorted_$$.tmp
 	echo "0);" >> ${3}
 	
