@@ -1,19 +1,26 @@
-#mac,ip,iface,peak_in,peak_out,offpeak_in,offpeak_out,total,first_date,last_date
+#!@todo new hosts, locks, offpeak, arp
+
+function total(i){
+    return(bwp[i "/in"] + bwp[i "/out"] + bwo[i "/in"] + bwo[i "/out"])
+}
+
 BEGIN {od=""}
 
 /^#/{FS=","; next }
 
 # data from database; first file
 FNR==NR{
-    #!@todo could also build mac->ip table
     if($2 == "NA")
 	n=$1
     else
 	n=$2
-    bw[n "/in"]   =  $4
-    bw[n "/out"]  =  $5
-    bw[n "/in"]  +=  $6
-    bw[n "/out"] +=  $7
+    mac[n]        =  $1
+    ip[n]         =  $2
+    inter[n]      =  $3
+    bwp[n "/in"]  =  $4
+    bwp[n "/out"] =  $5
+    bwo[n "/in"]  =  $6
+    bwo[n "/out"] =  $7
     firstDate[n]  =  $9
     lastDate[n]   = $10
     next
@@ -53,9 +60,12 @@ $2 > 0{
 	n=$8 "/in"
     else
 	n=$9 "/out"
-    bw[n]+=$2
+    #!@todo offpeak
+    bwp[n]+=$2
 }
 
 END {
-    for(i in bw) print i, bw[i]
+    print "#mac,ip,iface,peak_in,peak_out,offpeak_in,offpeak_out,total,first_date,last_date"
+    OFS=","
+    for(i in mac) print mac[i], ip[i], inter[i], bwp[i "/in"], bwp[i "/out"], bwo[i "/in"], bwo[i "/out"], total(i), firstDate[i], lastDate[i]
 }

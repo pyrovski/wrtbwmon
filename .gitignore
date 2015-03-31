@@ -1,0 +1,7 @@
+*.log
+*~
+*.db
+*.htm
+old
+*.old
+.RData
