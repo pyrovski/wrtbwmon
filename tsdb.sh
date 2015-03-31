@@ -1,6 +1,6 @@
-#!/bin/sh
+#!/usr/bin/awk
 
-awk '\
+#!@todo this should keep an array of data per host
 {
   split($1,a,"/");
   tmin=a[1];
@@ -13,4 +13,4 @@ awk '\
   };
   printf "%10.2f %d\n", t, s
   fflush()
-}'
+}

@@ -1,9 +1,11 @@
 #!/bin/sh
 
+#!@todo this should output multiple streams, tagged by host
+
 period=$1
 [ -n "$period" ] || period=10
 while true; do
-    sudo iptables -nvxL RRDIPT_INPUT -t mangle | grep ' eth0 '
+    iptables -nvxL RRDIPT_INPUT -t mangle | grep ' eth0 '
 done | awk '
 function newFile(n){
   return(sprintf("realtime.%06d.log", n))
