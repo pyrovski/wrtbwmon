@@ -53,6 +53,7 @@ lookup()
 	esac
 	[ -n "$USER" ] && break
     done
+    #!@todo get hostname with: nslookup $IP | grep "$IP " | cut -d' ' -f4
     [ -z "$USER" ] && USER=${MAC}
     echo $USER
 }
@@ -220,8 +221,6 @@ updatedb()
 	OFFPEAKUSAGE_OUT=0
 
 	firstDate=$(dateFormat)
-	
-	#!@todo get hostname with: nslookup $IP | grep "$IP " | cut -d' ' -f4
     else
 	echo $LINE | cut -s -d, -f4-9 > "/tmp/${MAC}_$$.tmp"
 	IFS=, read PEAKUSAGE_IN PEAKUSAGE_OUT OFFPEAKUSAGE_IN OFFPEAKUSAGE_OUT _ firstDate < "/tmp/${MAC}_$$.tmp"
