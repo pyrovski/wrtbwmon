@@ -224,7 +224,7 @@ case $1 in
 	unlock
 
         # create HTML page
-	awk '/^#cut here 1/{flag=1;next}/^#cut here 2/{flag=0}flag'< $0 > ${3}
+	cp usage.htm1 $3
 	while IFS=, read PEAKUSAGE_IN MAC IP IFACE PEAKUSAGE_OUT OFFPEAKUSAGE_IN OFFPEAKUSAGE_OUT TOTAL FIRSTSEEN LASTSEEN
 	do
 	    echo "
@@ -233,7 +233,7 @@ $PEAKUSAGE_IN,$PEAKUSAGE_OUT,$OFFPEAKUSAGE_IN,$OFFPEAKUSAGE_OUT,$TOTAL,\"$FIRSTS
 	done < /tmp/sorted_$$.tmp
 	echo "0);" >> ${3}
 	
-	awk 'f;/^#cut here 2/{f=1}' < $0 | sed "s/(date)/`date`/" >> $3
+	sed "s/(date)/`date`/" < usage.htm2 >> $3
 	
 	#Free some memory
 	rm -f /tmp/*_$$.tmp
@@ -245,7 +245,7 @@ $PEAKUSAGE_IN,$PEAKUSAGE_OUT,$OFFPEAKUSAGE_IN,$OFFPEAKUSAGE_OUT,$TOTAL,\"$FIRSTS
 	done
 
 	#For each host in the ARP table
-        grep -vi '^IP\|0x0' /proc/net/arp > /tmp/arp_$$.tmp 
+        grep -vi '^IP\|0x0' /proc/net/arp > /tmp/arp_$$.tmp
 	while read IP TYPE FLAGS MAC MASK IFACE
 	do
 	    newRule FORWARD $IP
@@ -287,54 +287,3 @@ $PEAKUSAGE_IN,$PEAKUSAGE_OUT,$OFFPEAKUSAGE_IN,$OFFPEAKUSAGE_OUT,$TOTAL,\"$FIRSTS
 	echo "       Its format is: 00:MA:CA:DD:RE:SS,username , with one entry per line"
 	;;
 esac
-
-exit
-
-#cut here 1#
-<html><head><title>Traffic</title>
-<script type="text/javascript">
-function getSize(size) {
-    var prefix=new Array("","k","M","G","T","P","E","Z"); var base=1000;
-    var pos=0;
-    while (size>base) {
-        size/=base; pos++;
-    }
-    if (pos > 2) precision=1000; else precision = 1;
-    return (Math.round(size*precision)/precision)+' '+prefix[pos];}
-</script></head>
-<body><h1>Total Usage:</h1>
-<table border="1">
-<tr bgcolor=silver>
-<th>User</th>
-<th>Peak download</th>
-<th>Peak upload</th>
-<th>Offpeak download</th>
-<th>Offpeak upload</th>
-<th>Total</th>
-<th>First seen</th>
-<th>Last seen</th>
-</tr>
-<script type="text/javascript">
-var values = new Array(
-
-#cut here 2#    
-for (i=0; i < values.length-1; i++) {
-    document.write("<tr><td>");
-    document.write(values[i][0]);
-    document.write("</td>");
-    for (j=1; j < 6; j++) {
-        document.write("<td>");
-        document.write(getSize(values[i][j]));
-        document.write("</td>");
-    }
-    document.write("<td>");
-    document.write(values[i][6]);
-    document.write("</td>");
-    document.write("<td>");
-    document.write(values[i][7]);
-    document.write("</td>");
-    document.write("</tr>");
-}
-</script></table>
-<br /><small>This page was generated on (date)</small>
-</body></html>
