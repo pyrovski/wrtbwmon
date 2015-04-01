@@ -23,6 +23,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 #!@todo add logger
+#!@todo store time series data
 
 trap "rm -f /tmp/*$$.tmp; kill -SIGINT $$" SIGINT
 
