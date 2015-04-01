@@ -24,7 +24,7 @@
 
 #!@todo add logger
 
-trap "unlock; exit 1" SIGINT
+trap "rm -f /tmp/*$$.tmp; kill -SIGINT $$" SIGINT
 
 chains='INPUT OUTPUT FORWARD'
 DEBUG=
@@ -110,12 +110,14 @@ lock()
 	attempts=$((attempts+1))
     done
 #    [[ -n "$DEBUG" ]] && echo $$ "got lock"
+    trap "" SIGINT
 }
 
 unlock()
 {
     rm -f /tmp/wrtbwmon.lock
 #    [[ -n "$DEBUG" ]] && echo $$ "released lock"
+    trap "rm -f /tmp/*$$.tmp; kill -SIGINT $$" SIGINT
 }
 
 # chain
@@ -161,16 +163,16 @@ newRule()
 {
     chain=$1
     IP=$2
-
+    
     #Add iptable rules (if non existing).
     iptables -t mangle -nL RRDIPT_$chain | grep "$IP " > /dev/null
     if [ $? -ne 0 ]; then
-	if [ "$chain" = "OUTPUT" -o "$chain" = "FORWARD" ]; then
-	    iptables -t mangle -I RRDIPT_$chain -d $IP -j RETURN
-	fi
-	if [ "$chain" = "INPUT" -o "$chain" = "FORWARD" ]; then
-	    iptables -t mangle -I RRDIPT_$chain -s $IP -j RETURN
-	fi
+        if [ "$chain" = "OUTPUT" -o "$chain" = "FORWARD" ]; then
+            iptables -t mangle -I RRDIPT_$chain -d $IP -j RETURN
+        fi
+        if [ "$chain" = "INPUT" -o "$chain" = "FORWARD" ]; then
+            iptables -t mangle -I RRDIPT_$chain -s $IP -j RETURN
+        fi
     fi
 }
 
@@ -192,61 +194,6 @@ readIF()
     echo "$IN $OUT"
 }
 
-# MAC IP IFACE IN OUT DB
-updatedb()
-{
-    MAC=$1
-    IP=$2
-    IFACE=$3
-    IN=$4
-    OUT=$5
-    DB=$6
-    
-    [ -n "$DEBUG" ] && echo "DEBUG: New traffic for $MAC/$IP since last update: $IN:$OUT"
-    
-    LINE=$(grep ${MAC} $DB)
-    if [ -z "$LINE" ]; then
-	[ -n "$DEBUG" ] && echo "DEBUG: $MAC/$IP is a new host !"
-
-	# add rules for new host
-	if [ -n "$tun" -a "$IP" = "NA" ]; then
-	    for chain in INPUT OUTPUT; do
-		newRuleIF $chain $tun
-	    done
-	fi
-	newRule FORWARD $IP
-	
-	PEAKUSAGE_IN=0
-	PEAKUSAGE_OUT=0
-	OFFPEAKUSAGE_IN=0
-	OFFPEAKUSAGE_OUT=0
-
-	firstDate=$(dateFormat)
-    else
-	echo $LINE | cut -s -d, -f4-9 > "/tmp/${MAC}_$$.tmp"
-	IFS=, read PEAKUSAGE_IN PEAKUSAGE_OUT OFFPEAKUSAGE_IN OFFPEAKUSAGE_OUT _ firstDate < "/tmp/${MAC}_$$.tmp"
-    fi
-    
-    if [ "${3}" = "offpeak" ]; then
-	echo $LINE | cut -f6,7 -s -d, > "/tmp/${MAC}_$$.tmp"
-	IFS=, read OFFPEAKUSAGE_IN OFFPEAKUSAGE_OUT < "/tmp/${MAC}_$$.tmp"
-	OFFPEAKUSAGE_IN=$((OFFPEAKUSAGE_IN + IN))
-	OFFPEAKUSAGE_OUT=$((OFFPEAKUSAGE_OUT + OUT))
-    else
-	echo $LINE | cut -f4,5 -s -d, > "/tmp/${MAC}_$$.tmp"
-	IFS=, read PEAKUSAGE_IN PEAKUSAGE_OUT < "/tmp/${MAC}_$$.tmp"
-	PEAKUSAGE_IN=$((PEAKUSAGE_IN + IN))
-	PEAKUSAGE_OUT=$((PEAKUSAGE_OUT + OUT))
-    fi
-    TOTAL=$((OFFPEAKUSAGE_OUT + OFFPEAKUSAGE_IN + PEAKUSAGE_OUT + PEAKUSAGE_IN))
-
-#    rm -f "/tmp/${MAC}_$$.tmp"
-    
-    echo $MAC >> /tmp/updated_$$.tmp
-
-    echo $MAC,$IP,$IFACE,$PEAKUSAGE_IN,$PEAKUSAGE_OUT,$OFFPEAKUSAGE_IN,$OFFPEAKUSAGE_OUT,$TOTAL,$firstDate,$(dateFormat) >> /tmp/db_$$.tmp
-}
-
 ############################################################
 
 case $1 in
@@ -257,57 +204,12 @@ case $1 in
 
 	lock
 
-	#Read and reset counters
-	for chain in $chains; do
-	    iptables -t mangle -L RRDIPT_$chain -vnxZ > /tmp/traffic_${chain}_$$.tmp
-	done
+	iptables -nvxL RRDIPT_FORWARD -t mangle -Z | awk -f readDB.awk $DB /proc/net/arp -
 
-	# read tun data
-	if [ -n "$tun" ]; then
-	    IN_OUT=`readIF $tun`
-	    IN=`echo $IN_OUT | cut -d' ' -f1`
-	    OUT=`echo $IN_OUT | cut -d' ' -f2`
-	    [ "$IN" -gt 0 -o "$OUT" -gt 0 ] && \
-		updatedb "($tun)" NA $tun $IN $OUT $DB
-	fi
-
-	wan=$(detectWAN)
-	if [ -n "$wan" ]; then
-	    # read WAN data
-	    IN_OUT=$(readIF $wan)
-	    IN=`echo $IN_OUT | cut -d' ' -f1`
-	    OUT=`echo $IN_OUT | cut -d' ' -f2`
-	    
-	    [ "${IN}" -gt 0 -o "${OUT}" -gt 0 ] && \
-		updatedb "(WAN)" NA $wan $IN $OUT $DB
-	fi
-	
-        grep -vi '^IP\|0x0' /proc/net/arp > /tmp/arp_$$.tmp 
-	while read IP _ _ MAC _ IFACE
-	do
-	    IN=0
-	    OUT=0
-	    #Add new data to the graph.
-	    grep $IP /tmp/traffic_FORWARD_$$.tmp > /tmp/${IP}_FORWARD_$$.tmp
-	    while read _ BYTES _ _ _ IFIN IFOUT SRC DST
-	    do
-		#!@todo OUT and IN used here refer to the IP's perspective, not ours
-		[ "$DST" = "$IP" ] && IN=$((IN + BYTES))
-		[ "$SRC" = "$IP" ] && OUT=$((OUT + BYTES))
-	    done < /tmp/${IP}_FORWARD_$$.tmp
-	    #rm -f /tmp/${IP}_FORWARD_$$.tmp
-	    
-	    if [ "${IN}" -gt 0 -o "${OUT}" -gt 0 ]; then
-		updatedb $MAC $IP $IFACE $IN $OUT $DB
-	    fi
-	done < /tmp/arp_$$.tmp
-
-	egrep -v `tr '\n' '|' < /tmp/updated_$$.tmp | sed 's/|$//'` $DB > /tmp/stale_$$.tmp
-	cat /tmp/stale_$$.tmp /tmp/db_$$.tmp > $DB
+	unlock
 
         #Free some memory
 	rm -f /tmp/*_$$.tmp
-	unlock
 	exit
 	;;
     

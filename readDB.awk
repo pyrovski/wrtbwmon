@@ -16,6 +16,7 @@ BEGIN {
     od=""
     fid=1
     debug=0
+    rrd=0
 }
 
 /^#/ {
@@ -55,7 +56,7 @@ fid==2 {
     arp_flags = $3
     arp_mac   = $4
     arp_dev   = $6
-    if(!(arp_ip in ip) && arp_flags != "0x0"){
+    if(arp_flags != "0x0" && !(arp_ip in ip)){
 	if(debug)
 	    print "new host:", arp_ip, arp_flags > "/dev/stderr"
 	# new host; add rule
@@ -70,10 +71,16 @@ fid==2 {
 }
 
 # skip line
-fid==3 && (NF < 9 || $1=="pkts"){ next }
+# read the chain name and deal with the data accordingly
+fid==3 && $1 == "Chain"{
+    rrd=$2 ~ /RRDIPT_.*/
+    next
+}
+
+fid==3 && rrd && (NF < 9 || $1=="pkts"){ next }
 
 # iptables input
-fid==3 && $2 > 0{
+fid==3 && rrd && $2 > 0{
     if($6 != "*")
 	n=$6 "/in"
     else if($7 != "*")
@@ -83,13 +90,15 @@ fid==3 && $2 > 0{
     else
 	n=$9 "/out"
     #!@todo offpeak
-    if(mode == "diff")
+    if(mode == "diff" || mode == "noUpdate")
 	print n, $2
-    bwp[n]+=$2
+    if(mode!="noUpdate")
+	bwp[n]+=$2
 }
 
-
 END {
+    if(mode=="noUpdate")
+	exit
     close(dbFile)
     print "#mac,ip,iface,peak_in,peak_out,offpeak_in,offpeak_out,total,first_date,last_date" > dbFile
     OFS=","
