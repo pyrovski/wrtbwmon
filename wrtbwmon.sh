@@ -100,8 +100,9 @@ lock()
 	    if [ ! -d /proc/$(< /tmp/wrtbwmon.lock) ]; then
 		echo "WARNING: Lockfile detected but process $(cat /tmp/wrtbwmon.lock) does not exist !"
 		rm -f /tmp/wrtbwmon.lock
+	    else
+		sleep 1
 	    fi
-	    sleep 1
 	done
 	echo $$ > /tmp/wrtbwmon.lock
 	read lockPID < /tmp/wrtbwmon.lock
