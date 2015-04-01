@@ -1,4 +1,4 @@
-#!@todo new hosts, locks, offpeak, arp
+#!@todo locks, offpeak
 
 function total(i){
     return(bwp[i "/in"] + bwp[i "/out"] + bwo[i "/in"] + bwo[i "/out"])
