@@ -43,7 +43,7 @@ FNR==NR {
 }
 
 # not triggered on the first file
-FNR==0 {
+FNR==1 {
     FS=" "
     fid++
     next
@@ -70,7 +70,7 @@ fid==2 {
 }
 
 # skip line
-fid==3 && $1=="pkts" { next }
+fid==3 && (NF < 9 || $1=="pkts"){ next }
 
 # iptables input
 fid==3 && $2 > 0{
@@ -83,6 +83,8 @@ fid==3 && $2 > 0{
     else
 	n=$9 "/out"
     #!@todo offpeak
+    if(mode == "diff")
+	print n, $2
     bwp[n]+=$2
 }
 
