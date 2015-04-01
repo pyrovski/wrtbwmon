@@ -1,4 +1,4 @@
-#!@todo locks, offpeak
+#!@todo locks, offpeak, interfaces
 
 function total(i){
     return(bwp[i "/in"] + bwp[i "/out"] + bwo[i "/in"] + bwo[i "/out"])
@@ -61,12 +61,11 @@ fid==2 {
 	# new host; add rule
 	"iptables -t mangle -I RRDIPT_FORWARD -d arp_ip -j RETURN"
 	"iptables -t mangle -I RRDIPT_FORWARD -s arp_ip -j RETURN"
-	mac[arp_ip] = arp_mac
-	ip[arp_ip] = arp_ip
+	mac[arp_ip]   = arp_mac
+	ip[arp_ip]    = arp_ip
 	inter[arp_ip] = arp_dev
 	bwp[arp_ip "/in"]=bwp[arp_ip "/out"]=bwo[arp_ip "/in"]=bwo[arp_ip "/out"] = 0
-	d = date()
-	firstDate[arp_ip]=lastDate[arp_ip] = d
+	firstDate[arp_ip]=lastDate[arp_ip] = date()
     }
 }
 
