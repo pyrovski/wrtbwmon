@@ -109,14 +109,14 @@ lock()
 	[[ $$ -eq "$lockPID" ]] && break;
 	attempts=$((attempts+1))
     done
-#    [[ -n "$DEBUG" ]] && echo $$ "got lock"
+    #[[ -n "$DEBUG" ]] && echo $$ "got lock after $attempts attempts"
     trap "" SIGINT
 }
 
 unlock()
 {
     rm -f /tmp/wrtbwmon.lock
-#    [[ -n "$DEBUG" ]] && echo $$ "released lock"
+    #[[ -n "$DEBUG" ]] && echo $$ "released lock"
     trap "rm -f /tmp/*$$.tmp; kill -SIGINT $$" SIGINT
 }
 
@@ -176,24 +176,6 @@ newRule()
     fi
 }
 
-# interface
-readIF()
-{
-    IF=$1
-    for chain in INPUT OUTPUT; do
-	grep " $IF " /tmp/traffic_${chain}_$$.tmp > \
-	     /tmp/${IF}_${chain}_$$.tmp
-	read PKTS BYTES TARGET PROT OPT IFIN IFOUT SRC DST < \
-	     /tmp/${IF}_${chain}_$$.tmp
-	[ "$chain" = "OUTPUT" ] && [ "$IFOUT" = "$IF" ] && \
-	    OUT=$((OUT + BYTES))
-	[ "$chain" = "INPUT" ] && [ "$IFIN" = "$IF" ] && \
-	    IN=$((IN + BYTES))
-#	rm -f /tmp/${IF}_${chain}_$$.tmp
-    done
-    echo "$IN $OUT"
-}
-
 ############################################################
 
 case $1 in
@@ -204,7 +186,7 @@ case $1 in
 
 	lock
 
-	iptables -nvxL RRDIPT_FORWARD -t mangle -Z | awk -f readDB.awk $DB /proc/net/arp -
+	iptables -nvxL -t mangle -Z | awk -f readDB.awk $DB /proc/net/arp -
 
 	unlock
 
