@@ -24,8 +24,10 @@
 
 #!@todo add logger
 #!@todo store time series data
+#!@todo reference awk scripts and html templates in predictable location
 
 trap "rm -f /tmp/*$$.tmp; kill -SIGINT $$" SIGINT
+baseDir=/mnt/cifs2
 
 chains='INPUT OUTPUT FORWARD'
 DEBUG=
@@ -187,7 +189,7 @@ case $1 in
 
 	lock
 
-	iptables -nvxL -t mangle -Z | awk -f readDB.awk $DB /proc/net/arp -
+	iptables -nvxL -t mangle -Z | awk -f $baseDir/readDB.awk $DB /proc/net/arp -
 
 	unlock
 
@@ -207,7 +209,7 @@ case $1 in
 	unlock
 
         # create HTML page
-	cp usage.htm1 $3
+	cp $baseDir/usage.htm1 $3
 	while IFS=, read PEAKUSAGE_IN MAC IP IFACE PEAKUSAGE_OUT OFFPEAKUSAGE_IN OFFPEAKUSAGE_OUT TOTAL FIRSTSEEN LASTSEEN
 	do
 	    echo "
@@ -216,7 +218,7 @@ $PEAKUSAGE_IN,$PEAKUSAGE_OUT,$OFFPEAKUSAGE_IN,$OFFPEAKUSAGE_OUT,$TOTAL,\"$FIRSTS
 	done < /tmp/sorted_$$.tmp
 	echo "0);" >> ${3}
 	
-	sed "s/(date)/`date`/" < usage.htm2 >> $3
+	sed "s/(date)/`date`/" < $baseDir/usage.htm2 >> $3
 	
 	#Free some memory
 	rm -f /tmp/*_$$.tmp
