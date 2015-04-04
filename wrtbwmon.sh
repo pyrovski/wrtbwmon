@@ -194,7 +194,8 @@ case $1 in
 
 	lock
 
-	iptables -nvxL -t mangle -Z | awk -v wan="$wan" -f $baseDir/readDB.awk $DB /proc/net/arp -
+	[ "$mode" = "diff" ] && date +%s.%N
+	iptables -nvxL -t mangle -Z | awk -v mode="$mode" wan="$wan" -f $baseDir/readDB.awk $DB /proc/net/arp -
 
 	unlock
 
