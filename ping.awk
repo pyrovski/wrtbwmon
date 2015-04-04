@@ -4,6 +4,8 @@ BEGIN{
     lastSuccess=""
     lastFail=""
     last=1
+    min=100000.0
+    t=max=sum=0
 }
 /^(P|#|$)/{
     next
@@ -11,11 +13,15 @@ BEGIN{
 /.*bytes.*/{
     sC++
     gsub("[][]","",$1)
-    if(!last){
+    if(!last)
 	print "down from", lastSuccess, "to", $1 ":", $1 - lastSuccess "s"
-    }
     last=1
     lastSuccess=$1
+    sub("time=","",$8)
+    t=$8+0
+    sum+=t
+    min=(t < min)?t:min
+    max=(t > max)?t:max
     next
 }
 /.*Unre.*/{
@@ -24,8 +30,11 @@ BEGIN{
     lastFail=$1
     next
 }
-{print}
+{}
 END{
+    print "average:", sum/sC "ms"
+    print "min:", min "ms"
+    print "max:", max "ms"
 #print sC
 }
 
