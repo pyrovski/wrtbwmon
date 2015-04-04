@@ -28,9 +28,9 @@ BEGIN {
 # data from database; first file
 FNR==NR {
     if($2 == "NA")
-	n=$1
-    else
-	n=$2
+	#!@todo could get interface IP here
+	$2=$1
+    n=$2
     mac[n]        =  $1
     ip[n]         =  $2
     inter[n]      =  $3
@@ -68,6 +68,7 @@ fid==2 {
 	bwp[arp_ip "/in"]=bwp[arp_ip "/out"]=bwo[arp_ip "/in"]=bwo[arp_ip "/out"] = 0
 	firstDate[arp_ip]=lastDate[arp_ip] = date()
     }
+    next
 }
 
 # skip line
@@ -81,19 +82,29 @@ fid==3 && rrd && (NF < 9 || $1=="pkts"){ next }
 
 # iptables input
 fid==3 && rrd && $2 > 0{
-    if($6 != "*")
+    if($6 != "*"){
 	n=$6 "/in"
-    else if($7 != "*")
+	m=$6
+    } else if($7 != "*"){
 	n=$7 "/out"
-    else if($8 != "0.0.0.0/0")
+	m=$7
+    } else if($8 != "0.0.0.0/0"){
 	n=$8 "/in"
-    else
+	m=$8
+    } else {
 	n=$9 "/out"
+	m=$9
+    }
     #!@todo offpeak
     if(mode == "diff" || mode == "noUpdate")
 	print n, $2
-    if(mode!="noUpdate")
+    if(mode!="noUpdate"){
 	bwp[n]+=$2
+	# compare label to wan input variable
+	if(m == wan) m = "(WAN)"
+	lastDate[m] = date()
+    }
+#    print n,m,$2,lastDate[m] > "/dev/stderr"
 }
 
 END {

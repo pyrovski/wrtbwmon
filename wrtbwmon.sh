@@ -187,9 +187,14 @@ case $1 in
 	[ ! -f "$DB" ] && echo $header > "$DB"
 	[ ! -w "$DB" ] && echo "ERROR: $DB not writable" && exit 1
 
+	wan=$(detectWAN)
+	if [ -z "$wan" ]; then
+	    echo "Warning: failed to detect WAN interface."
+	fi
+
 	lock
 
-	iptables -nvxL -t mangle -Z | awk -f $baseDir/readDB.awk $DB /proc/net/arp -
+	iptables -nvxL -t mangle -Z | awk -v wan="$wan" -f $baseDir/readDB.awk $DB /proc/net/arp -
 
 	unlock
 
