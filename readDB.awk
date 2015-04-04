@@ -60,8 +60,8 @@ fid==2 {
 	if(debug)
 	    print "new host:", arp_ip, arp_flags > "/dev/stderr"
 	# new host; add rule
-	"iptables -t mangle -I RRDIPT_FORWARD -d arp_ip -j RETURN"
-	"iptables -t mangle -I RRDIPT_FORWARD -s arp_ip -j RETURN"
+	"iptables -t mangle -I RRDIPT_FORWARD -d " arp_ip " -j RETURN"
+	"iptables -t mangle -I RRDIPT_FORWARD -s " arp_ip " -j RETURN"
 	mac[arp_ip]   = arp_mac
 	ip[arp_ip]    = arp_ip
 	inter[arp_ip] = arp_dev
