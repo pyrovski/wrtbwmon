@@ -7,3 +7,4 @@ usage.htm
 \#*
 old
 *.tsdb
+.Rhistory
