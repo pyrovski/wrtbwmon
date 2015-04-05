@@ -1,8 +1,19 @@
 #!/bin/sh
 
 go=1
+collect=0
 
 trap "go=0" SIGINT
+
+updatePID()
+{
+    t='/tmp/$$.sh'
+    echo 'echo $PPID > /tmp/pid' > $t
+    sh $t
+    rm -f $t
+    trap "collect=1" SIGUSR1
+    childReady=1
+}
 
 lock()
 {
@@ -61,12 +72,23 @@ wan=$(detectWAN)
 
 lock
 
+childReady=0
+[ -p /tmp/wrtbwmon.pipe ] || mkfifo /tmp/wrtbwmon.pipe
+
 while [ $go -eq 1 ] ; do
-    (date +%s.%N; \
-     iptables -nvxL -t mangle -Z | \
-	 awk -v mode=diff wan="$wan" -f readDB.awk usage.db /proc/net/arp - )
+    if [ $childReady -eq 0 ]; then
+	updatePID
+    fi
+    date +%s.%N; \
+    iptables -nvxL -t mangle -Z | \
+	awk -v mode=diff wan="$wan" -f readDB.awk usage.db /proc/net/arp -
+    if [ "$collect" -eq 1 ]; then
+	echo -e "\ncollect\n"
+	collect=0
+    fi
 done | awk -f tsdb.awk
 
+rm -f /tmp/pid
 unlock
 
 echo no go

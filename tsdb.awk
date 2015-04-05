@@ -9,6 +9,7 @@ BEGIN{
 
     for(i=1; i <= numLabels; i++)
 	intervalMap[s_intervals[i]] = s_labels[i]
+    pipe="/tmp/wrtbwmon.pipe"
 }
 
 function addEntry(t, _in, _out, entryFile){
@@ -72,8 +73,10 @@ function compact(host,  i){
     }
     r=0
     for(i=1; i < numLabels; i++)
-	if(!r)
+	if(!r){
 	    r=_compact(host, s_intervals[i], s_intervals[i+1])
+	    #if(s_intervals[i+1] ...)
+	}
     lastCompact[host] = t
 }
 
@@ -84,13 +87,28 @@ function dump(){
 	addEntry(t, db_in[host], db_out[host], "./" host "." intervalMap[0] ".tsdb")
 	delete db_in[host]
 	delete db_out[host]
+	hosts[host] = ""
     }
 }
 
-NF==1{
+NF==1 && $1 ~ /[0-9]+[.][0-9]+/{
     t=$1
     printf "%s\r", t
     dump()
+    next
+}
+
+NF==1 && $1 == "collect"{
+    print "start" > pipe
+    #!@todo this only prints hosts that have generated traffic since script start
+    for(host in hosts){
+	print host
+	print "start", host > pipe
+	system("cat "host".*.tsdb| tr ' ' '\n' | sort -n > "pipe)
+	print "end", host > pipe
+    }
+    print "end" > pipe
+    close(pipe)
     next
 }
 
