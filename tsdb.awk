@@ -99,16 +99,21 @@ NF==1 && $1 ~ /[0-9]+[.][0-9]+/{
 }
 
 NF==1 && $1 == "collect"{
-    print "start" > pipe
+    print "collect!\n"
+    getline pid < "/tmp/wrtbwmon.pid"
+    close("/tmp/wrtbwmon.pid")
+    system("rm -f /tmp/wrtbwmon.pid")
+    pidPipe = "/tmp/"pid".pipe"
+    print "start" > pidPipe
     #!@todo this only prints hosts that have generated traffic since script start
     for(host in hosts){
 	print host
-	print "start", host > pipe
-	system("cat "host".*.tsdb| tr ' ' '\n' | sort -n > "pipe)
-	print "end", host > pipe
+	print "start", host > pidPipe
+	system("cat "host".*.tsdb| tr ' ' '\n' | sort -n > "pidPipe)
+	print "end", host > pidPipe
     }
-    print "end" > pipe
-    close(pipe)
+    print "end" > pidPipe
+    close(pidPipe)
     next
 }
 
