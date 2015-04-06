@@ -1,5 +1,10 @@
 #!/usr/bin/awk
 
+#!@todo add a zero entry if a host had no data in at least one
+#!sample. Without this, it will appear as if the host had extremely
+#!low throughput over a large time window, as opposed to bursty normal
+#!throughput.
+
 BEGIN{
     t=0
     intervals="0 10  60 3600 86400 2628000 31536000"
@@ -26,7 +31,7 @@ function _compact(host, interval, interval2,  i,n,l,a,f){
     }
 #    print "compacting", host, interval, interval2
     lastCompact[key] = t
-    f="./" host "." intervalMap[interval] ".tsdb"
+    f="./" host "_" intervalMap[interval] ".tsdb"
 #    print f
     close(f)
     line=0
@@ -45,7 +50,7 @@ function _compact(host, interval, interval2,  i,n,l,a,f){
 	    s_in  += $2
 	    s_out += $3
 	    if($1 - lastTS >= interval2 - interval){
-		nextF = "./" host "." intervalMap[interval2] ".tsdb"
+		nextF = "./" host "_" intervalMap[interval2] ".tsdb"
 		addEntry($1, s_in, s_out, nextF)
 		    print $1, s_in, s_out, nextF
 		    lastTS=$1
@@ -59,7 +64,7 @@ function _compact(host, interval, interval2,  i,n,l,a,f){
 	# retain entries not compacted
 	if(lastLine != line){
 #	    print line-lastLine " leftover of " line " entries"
-	    tmpF = "/tmp/"host"."intervalMap[interval]".tsdb"
+	    tmpF = "/tmp/"host"_"intervalMap[interval]".tsdb"
 	    cmd = "tail -n +" lastLine+1" "f " > " tmpF " && mv " tmpF " " f" 2>/dev/null"
 	    system(cmd)
 	} else
@@ -89,7 +94,7 @@ function dump(){
     for(host in db_in){
 	if(t-lastCompact[host] >= 10)
 	    compact(host)
-	addEntry(t, db_in[host], db_out[host], "./" host "." intervalMap[0] ".tsdb")
+	addEntry(t, db_in[host], db_out[host], "./" host "_" intervalMap[0] ".tsdb")
 	delete db_in[host]
 	delete db_out[host]
 	if(!(host in hosts)){
@@ -107,7 +112,8 @@ NF==1 && $1 ~ /[0-9]+[.][0-9]+/{
 }
 
 NF==1 && $1 == "collect"{
-    print "collect!\n"
+    #!@todo we really just need to pause here and provide a consistent copy of the on-disk data
+    print t, "collect!\n"
     getline pid < "/tmp/wrtbwmon.pid"
 #    print pid
     split(pid, a, " ")
@@ -120,14 +126,17 @@ NF==1 && $1 == "collect"{
     #!@todo this only prints hosts that have generated traffic since script start
     hostCount = 1
     for(host in hosts){
-#	print host
+	print host
 	printf "\"" host "\":[[" > pidPipe
-	system("cat "host".*.tsdb | awk -v t="reqTime" 'NF==3 && $1>t' | sort -n > "pidPipe)
+	system("cat "host"_*.tsdb | awk -v t="reqTime" 'NF==3 && $1>t' > "pidPipe)
 	printf "0]]" > pidPipe
 	if(hostCount != numHosts)
 	    printf "," > pidPipe
 	hostCount++
     }
+#    cmd="awk -v t="reqTime" 'FNR==1{split(FILENAME,a,\"_\")}NF==3 && $1>t{$4=\"\\\"\"a[1]\"\\\"\"; print}' *.tsdb > "pidPipe
+#    print cmd
+#    system(cmd)
     print "}" > pidPipe
     close(pidPipe)
     next

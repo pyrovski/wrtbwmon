@@ -210,6 +210,7 @@ case $1 in
 	[ -z "$3" ] && echo "ERROR: Missing argument 3" && exit 1
 	
 	# first do some number crunching - rewrite the database so that it is sorted
+	#!@todo publishing doesn't need a lock, it needs a stable copy of the db. If continuous is running, send a signal to make a copy.
 	lock
 	grep -v '^#' $DB | awk -F, '{OFS=","; a=$4; $4=""; print a OFS $0}' | tr -s ',' | sort -rn > /tmp/sorted_$$.tmp
 	unlock

@@ -9,6 +9,7 @@ function getData(){
 	{
 	    document.getElementById("data").innerHTML=xmlhttp.responseText
 	    data=JSON.parse(xmlhttp.responseText)
+	    //!@todo sort data on client
 	    for(var k in data){
 		if(data.hasOwnProperty(k)){
 		    l = data[k].length
