@@ -10,10 +10,11 @@ BEGIN{
     for(i=1; i <= numLabels; i++)
 	intervalMap[s_intervals[i]] = s_labels[i]
     pipe="/tmp/wrtbwmon.pipe"
+    numHosts=0
 }
 
 function addEntry(t, _in, _out, entryFile){
-    printf "%f/%d/%d ", t, _in, _out >> entryFile
+    print t, _in, _out >> entryFile
 }
 
 function _compact(host, interval, interval2,  i,n,l,a,f){
@@ -28,40 +29,44 @@ function _compact(host, interval, interval2,  i,n,l,a,f){
     f="./" host "." intervalMap[interval] ".tsdb"
 #    print f
     close(f)
-    n=0
-    while(1==(r=getline line < f)){
-	n=split(line, l, " ")
-	if(n > 0){
-	    split(l[1], a, "/")
-	    firstTS=a[1]
-	    lastTS=firstTS
-	    last_i=s_in=s_out=0
-	    for(i in l){
-		split(l[i], a, "/")
-		s_in  += a[2]
-		s_out += a[3]
-		if(a[1] - lastTS > interval2 - interval){
-		    nextF = "./" host "." intervalMap[interval2] ".tsdb"
-		    addEntry(a[1], s_in, s_out, nextF)
-		    print a[1], s_in, s_out, nextF
-		    lastTS=a[1]
+    line=0
+    processed=0
+    while(1==(r=getline < f)){
+	line++
+	if(NF == 3){
+	    processed++
+	    if(line==1){
+#!@todo technically, this should be the time of the last entry in the
+#!interval2 file
+		lastTS=$1
+		lastLine=line
+		s_in=s_out=0
+	    }
+	    s_in  += $2
+	    s_out += $3
+	    if($1 - lastTS >= interval2 - interval){
+		nextF = "./" host "." intervalMap[interval2] ".tsdb"
+		addEntry($1, s_in, s_out, nextF)
+		    print $1, s_in, s_out, nextF
+		    lastTS=$1
 		    s_in=s_out=0
-		    last_i = i
-		}
+		    lastLine = line
 	    }
 	}
     }
     close(f)
-    if(n > 0){
-	system("rm -f " f)
+    if(processed > 0){
 	# retain entries not compacted
-	if(last_i != n){
-#	    print n-last_i " leftover of " n " entries"
-	    for(i=last_i + 1; i <= n; i++)
-		printf "%s ", l[i] > f
-	}
+	if(lastLine != line){
+#	    print line-lastLine " leftover of " line " entries"
+	    tmpF = "/tmp/"host"."intervalMap[interval]".tsdb"
+	    cmd = "tail -n +" lastLine+1" "f " > " tmpF " && mv " tmpF " " f" 2>/dev/null"
+	    system(cmd)
+	} else
+	    system("rm -f " f)
 	return(0)
     } else
+	# no lines processed, so next compaction doesn't need to run
 	return(1)
 }
 
@@ -87,7 +92,10 @@ function dump(){
 	addEntry(t, db_in[host], db_out[host], "./" host "." intervalMap[0] ".tsdb")
 	delete db_in[host]
 	delete db_out[host]
-	hosts[host] = ""
+	if(!(host in hosts)){
+	    numHosts++
+	    hosts[host] = ""
+	}
     }
 }
 
@@ -108,16 +116,19 @@ NF==1 && $1 == "collect"{
     close("/tmp/wrtbwmon.pid")
     system("rm -f /tmp/wrtbwmon.pid")
     pidPipe = "/tmp/"pid".pipe"
-    print "start" > pidPipe
+    print "{" > pidPipe
     #!@todo this only prints hosts that have generated traffic since script start
+    hostCount = 1
     for(host in hosts){
 	print host
-	print "\"" host "\":[" > pidPipe
-	# awk -v t=1428265913.723822 -F'/' 'BEGIN{RS=" "}$1 > t{print}' 
-	system("cat "host".*.tsdb | awk -v t="reqTime" -F/ 'BEGIN{RS=\" \"}$1>t' | sort -n > "pidPipe)
-	print "]," > pidPipe
+	printf "\"" host "\":[[" > pidPipe
+	system("cat "host".*.tsdb | awk -v t="reqTime" 'NF==3 && $1>t' | sort -n > "pidPipe)
+	printf "0]]" > pidPipe
+	if(hostCount != numHosts)
+	    printf "," > pidPipe
+	hostCount++
     }
-    print "\"null\":0\nend" > pidPipe
+    print "}" > pidPipe
     close(pidPipe)
     next
 }

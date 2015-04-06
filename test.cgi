@@ -7,7 +7,7 @@ echo -en "Content-Type: text/plain\nContent-Encoding: gzip\n\n"
 mkfifo /tmp/$$.pipe
 t=`echo "$QUERY_STRING" | sed -r 's/(^|.*,)t=([0-9]+([.][0-9]+)*).*/\2/'`
 echo "$$ $t" > /tmp/wrtbwmon.pid
-awk 'BEGIN{f=0}/^start$/{f=1;next}/^end$/{f=0;exit}f' < /tmp/$$.pipe | gzip &
+awk 'BEGIN{f=0;OFS=","}/\{/{f=1;print;next}f&&NF==3{ORS="],["; print $1,$2,$3}/\}/{f=0;;ORS="\n";print "0]]}";exit}' < /tmp/$$.pipe | gzip &
 kill -SIGUSR1 `cat /tmp/pid`
 wait
 rm -f /tmp/$$.pipe
