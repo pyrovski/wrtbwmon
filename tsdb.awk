@@ -109,7 +109,7 @@ NF==1 && $1 ~ /[0-9]+[.][0-9]+/{
 NF==1 && $1 == "collect"{
     print "collect!\n"
     getline pid < "/tmp/wrtbwmon.pid"
-    print pid
+#    print pid
     split(pid, a, " ")
     pid=a[1]
     reqTime=a[2]
@@ -120,7 +120,7 @@ NF==1 && $1 == "collect"{
     #!@todo this only prints hosts that have generated traffic since script start
     hostCount = 1
     for(host in hosts){
-	print host
+#	print host
 	printf "\"" host "\":[[" > pidPipe
 	system("cat "host".*.tsdb | awk -v t="reqTime" 'NF==3 && $1>t' | sort -n > "pidPipe)
 	printf "0]]" > pidPipe
