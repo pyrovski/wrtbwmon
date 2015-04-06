@@ -1,3 +1,5 @@
+var lastTime=0.0
+
 function getData(){
     var xmlhttp = new XMLHttpRequest()
     xmlhttp.onreadystatechange=function()
@@ -7,6 +9,6 @@ function getData(){
 	    document.getElementById("data").innerHTML=xmlhttp.responseText;
 	}
     }
-    xmlhttp.open("GET","/cgi-bin/test",true)
+    xmlhttp.open("GET","/cgi-bin/test?t=".concat(lastTime),true)
     xmlhttp.send()
 }

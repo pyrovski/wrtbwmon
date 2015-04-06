@@ -20,13 +20,13 @@ function _compact(host, interval, interval2,  i,n,l,a,f){
     key=host "." interval2
     tDiff = t-lastCompact[key]
     if(key in lastCompact && tDiff < interval2){
-	print "compacting", host, interval, interval2 ": not enough time elapsed:", tDiff
+#	print "compacting", host, interval, interval2 ": not enough time elapsed:", tDiff
 	return(1)
     }
-    print "compacting", host, interval, interval2
+#    print "compacting", host, interval, interval2
     lastCompact[key] = t
     f="./" host "." intervalMap[interval] ".tsdb"
-    print f
+#    print f
     close(f)
     n=0
     while(1==(r=getline line < f)){
@@ -56,7 +56,7 @@ function _compact(host, interval, interval2,  i,n,l,a,f){
 	system("rm -f " f)
 	# retain entries not compacted
 	if(last_i != n){
-	    print n-last_i " leftover of " n " entries"
+#	    print n-last_i " leftover of " n " entries"
 	    for(i=last_i + 1; i <= n; i++)
 		printf "%s ", l[i] > f
 	}
@@ -101,6 +101,10 @@ NF==1 && $1 ~ /[0-9]+[.][0-9]+/{
 NF==1 && $1 == "collect"{
     print "collect!\n"
     getline pid < "/tmp/wrtbwmon.pid"
+    print pid
+    split(pid, a, " ")
+    pid=a[1]
+    reqTime=a[2]
     close("/tmp/wrtbwmon.pid")
     system("rm -f /tmp/wrtbwmon.pid")
     pidPipe = "/tmp/"pid".pipe"
@@ -108,11 +112,12 @@ NF==1 && $1 == "collect"{
     #!@todo this only prints hosts that have generated traffic since script start
     for(host in hosts){
 	print host
-	print "start", host > pidPipe
-	system("cat "host".*.tsdb| tr ' ' '\n' | sort -n > "pidPipe)
-	print "end", host > pidPipe
+	print "\"" host "\":[" > pidPipe
+	# awk -v t=1428265913.723822 -F'/' 'BEGIN{RS=" "}$1 > t{print}' 
+	system("cat "host".*.tsdb | awk -v t="reqTime" -F/ 'BEGIN{RS=\" \"}$1>t' | sort -n > "pidPipe)
+	print "]," > pidPipe
     }
-    print "end" > pidPipe
+    print "\"null\":0\nend" > pidPipe
     close(pidPipe)
     next
 }

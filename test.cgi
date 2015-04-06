@@ -5,7 +5,8 @@ echo -en "Content-Type: text/plain\nContent-Encoding: gzip\n\n"
 #!filtering could be done in the cgi script or the tsdb awk script,
 #!with the latter being faster.
 mkfifo /tmp/$$.pipe
-echo $$ > /tmp/wrtbwmon.pid
+t=`echo "$QUERY_STRING" | sed -r 's/(^|.*,)t=([0-9]+([.][0-9]+)*).*/\2/'`
+echo "$$ $t" > /tmp/wrtbwmon.pid
 awk 'BEGIN{f=0}/^start$/{f=1;next}/^end$/{f=0;exit}f' < /tmp/$$.pipe | gzip &
 kill -SIGUSR1 `cat /tmp/pid`
 wait
