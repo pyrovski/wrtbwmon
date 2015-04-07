@@ -11,8 +11,7 @@ mkfifo /tmp/$$.pipe
 #!@todo this script should be modified to implement db backup functionality
 t=`echo "$QUERY_STRING" | sed -r 's/(^|.*,)t=([0-9]+([.][0-9]+)*).*/\2/'`
 
-#!@todo this could be done in awk, via the wrtbwmon pipe. However, that method has the chance of hanging the continuous awk script if this script fails.
-echo "$$ $t" > /tmp/wrtbwmon.pid
+echo "$$ $t" > /tmp/wrtbwmon.pipe &
 cat < /tmp/$$.pipe | gzip &
 kill -SIGUSR1 `cat /tmp/continuous.pid`
 wait

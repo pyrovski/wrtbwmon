@@ -119,14 +119,14 @@ NF==1 && $1 ~ /[0-9]+[.][0-9]+/{
 NF==1 && $1 == "collect"{
     #!@todo we really just need to pause here and provide a consistent copy of the on-disk data
     print t, "collect!\n"
-    getline pid < "/tmp/wrtbwmon.pid"
+    getline pid < pipe
     split(pid, a, " ")
     pid=a[1]
     reqTime=a[2]
-    close("/tmp/wrtbwmon.pid")
-    system("rm -f /tmp/wrtbwmon.pid")
+ #   close("/tmp/wrtbwmon.pid")
+#    system("rm -f /tmp/wrtbwmon.pid")
     pidPipe = "/tmp/"pid".pipe"
-    cmd="awk -v OFS=\",\" -v ts="reqTime" 'BEGIN{fc=0}FNR==1{fc++;if(fc>1){print \"0],\"}else{print \"{\"}split(FILENAME, a, \"_\"); print \"\\\"\"a[1]\"\\\":[\"}NF==3 && $1 > ts{print \"[\"$1,$2,$3\"],\"}END{print \"0]}\"}' *.tsdb >"pidPipe
+    cmd="awk -v ts="reqTime" -f ./dump.awk *.tsdb >"pidPipe
     system(cmd)
     close(pidPipe)
     next
