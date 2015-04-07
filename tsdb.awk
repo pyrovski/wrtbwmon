@@ -16,6 +16,7 @@ BEGIN{
 	intervalMap[s_intervals[i]] = s_labels[i]
     pipe="/tmp/wrtbwmon.pipe"
     numHosts=0
+    samples=0
 }
 
 function addEntry(t, _in, _out, entryFile){
@@ -102,9 +103,13 @@ function dump(){
 	    hosts[host] = ""
 	}
     }
+    samples++
 }
 
+#time
 NF==1 && $1 ~ /[0-9]+[.][0-9]+/{
+    if(t==0)
+	firstTS=$1
     t=$1
     printf "%s\r", t
     dump()
@@ -115,33 +120,21 @@ NF==1 && $1 == "collect"{
     #!@todo we really just need to pause here and provide a consistent copy of the on-disk data
     print t, "collect!\n"
     getline pid < "/tmp/wrtbwmon.pid"
-#    print pid
     split(pid, a, " ")
     pid=a[1]
     reqTime=a[2]
     close("/tmp/wrtbwmon.pid")
     system("rm -f /tmp/wrtbwmon.pid")
     pidPipe = "/tmp/"pid".pipe"
-    print "{" > pidPipe
-    #!@todo this only prints hosts that have generated traffic since script start
-    hostCount = 1
-    for(host in hosts){
-	print host
-	printf "\"" host "\":[[" > pidPipe
-	system("cat "host"_*.tsdb | awk -v t="reqTime" 'NF==3 && $1>t' > "pidPipe)
-	printf "0]]" > pidPipe
-	if(hostCount != numHosts)
-	    printf "," > pidPipe
-	hostCount++
-    }
-#    cmd="awk -v t="reqTime" 'FNR==1{split(FILENAME,a,\"_\")}NF==3 && $1>t{$4=\"\\\"\"a[1]\"\\\"\"; print}' *.tsdb > "pidPipe
-#    print cmd
-#    system(cmd)
-    print "}" > pidPipe
+    cmd="awk -v OFS=\",\" -v ts="reqTime" 'BEGIN{fc=0}FNR==1{fc++;if(fc>1){print \"0],\"}else{print \"{\"}split(FILENAME, a, \"_\"); print \"\\\"\"a[1]\"\\\":[\"}NF==3 && $1 > ts{print \"[\"$1,$2,$3\"],\"}END{print \"0]}\"}' *.tsdb >"pidPipe
+    system(cmd)
     close(pidPipe)
     next
 }
-
+NF==1 && $1 == "stats"{
+    duration=t-firstTS
+    print "\n"samples" samples in "duration"s: "samples/duration"/s"
+}
 {
     split($1, a, "/")
     host = a[1]

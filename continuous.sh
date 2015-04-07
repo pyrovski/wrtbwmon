@@ -2,6 +2,7 @@
 
 go=1
 collect=0
+stats=0
 
 trap "go=0" SIGINT
 
@@ -12,6 +13,7 @@ updatePID()
     sh $t
     rm -f $t
     trap "collect=1" SIGUSR1
+    trap "stats=1" SIGUSR2
     childReady=1
 }
 
@@ -85,6 +87,9 @@ while [ $go -eq 1 ] ; do
     if [ "$collect" -eq 1 ]; then
 	echo -e "\ncollect\n"
 	collect=0
+    elif [ "$stats" -eq 1 ]; then
+	echo -e "\nstats\n"
+	stats=0
     fi
 done | awk -f tsdb.awk
 
