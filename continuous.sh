@@ -17,6 +17,7 @@ updatePID()
     childReady=1
 }
 
+#!@todo functions are shared with wrtbwmon
 lock()
 {
     attempts=0

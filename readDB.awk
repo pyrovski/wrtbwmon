@@ -1,5 +1,3 @@
-#!@todo locks, offpeak, interfaces
-
 function total(i){
     return(bwp[i "/in"] + bwp[i "/out"] + bwo[i "/in"] + bwo[i "/out"])
 }
@@ -104,7 +102,6 @@ fid==3 && rrd && $2 > 0{
 	if(m == wan) m = "(WAN)"
 	lastDate[m] = date()
     }
-#    print n,m,$2,lastDate[m] > "/dev/stderr"
 }
 
 END {

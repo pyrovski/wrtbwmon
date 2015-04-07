@@ -1,9 +1,5 @@
 #!/bin/sh
 echo -en "Content-Type: text/plain\nContent-Encoding: gzip\n\n"
-#!@todo find a way to only return new data. This could be implemented
-#!by having the client request data after a specific timestamp. The
-#!filtering could be done in the cgi script or the tsdb awk script,
-#!with the latter being faster.
 mkfifo /tmp/$$.pipe
 
 #!@todo start continuous if not running
