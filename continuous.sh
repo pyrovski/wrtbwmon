@@ -8,7 +8,7 @@ trap "go=0" SIGINT
 updatePID()
 {
     t='/tmp/$$.sh'
-    echo 'echo $PPID > /tmp/pid' > $t
+    echo 'echo $PPID > /tmp/continuous.pid' > $t
     sh $t
     rm -f $t
     trap "collect=1" SIGUSR1
@@ -88,7 +88,7 @@ while [ $go -eq 1 ] ; do
     fi
 done | awk -f tsdb.awk
 
-rm -f /tmp/pid
+rm -f /tmp/continuous.pid
 unlock
 
 echo no go

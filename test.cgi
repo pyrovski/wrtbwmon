@@ -16,6 +16,6 @@ echo "$$ $t" > /tmp/wrtbwmon.pid
 awk 'BEGIN{f=0;OFS=","}/\{/{f=1;print;next}f&&NF==3{ORS="],["; print $1,$2,$3}/\}/{f=0;;ORS="\n";print "0]]}";exit}' < /tmp/$$.pipe | gzip &
 #cat < /tmp/$$.pipe &
 # awk 'FNR==1{split(FILENAME, a, "_"); print a[1]}NF==3 && $1 >  1428340279.09'  *.tsdb | gzip &
-kill -SIGUSR1 `cat /tmp/pid`
+kill -SIGUSR1 `cat /tmp/continuous.pid`
 wait
 rm -f /tmp/$$.pipe
