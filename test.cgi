@@ -12,7 +12,7 @@ mkfifo /tmp/$$.pipe
 t=`echo "$QUERY_STRING" | sed -r 's/(^|.*,)t=([0-9]+([.][0-9]+)*).*/\2/'`
 
 echo "$$ $t" > /tmp/wrtbwmon.pipe &
-cat < /tmp/$$.pipe | gzip &
+gzip -c `cat /tmp/$$.pipe` &
 kill -SIGUSR1 `cat /tmp/continuous.pid`
 wait
-rm -f /tmp/$$.pipe
+rm -f /tmp/$$.*

@@ -117,16 +117,18 @@ NF==1 && $1 ~ /[0-9]+[.][0-9]+/{
 }
 
 NF==1 && $1 == "collect"{
-    #!@todo we really just need to pause here and provide a consistent copy of the on-disk data
+    #!@todo we really just need to pause here and provide a consistent
+    # copy of the on-disk data. This would also be faster if we kept a
+    # copy in awk.
     print t, "collect!\n"
     getline pid < pipe
     split(pid, a, " ")
     pid=a[1]
     reqTime=a[2]
- #   close("/tmp/wrtbwmon.pid")
-#    system("rm -f /tmp/wrtbwmon.pid")
     pidPipe = "/tmp/"pid".pipe"
-    cmd="awk -v ts="reqTime" -f ./dump.awk *.tsdb >"pidPipe
+    pidDump = "/tmp/"pid".dump"
+    cmd="awk -v ts="reqTime" -f ./dump.awk *.tsdb > "pidDump
+    print pidDump > pidPipe
     system(cmd)
     close(pidPipe)
     next
