@@ -1,10 +1,5 @@
 #!/usr/bin/awk
 
-#!@todo add a zero entry if a host had no data in at least one
-#!sample. Without this, it will appear as if the host had extremely
-#!low throughput over a large time window, as opposed to bursty normal
-#!throughput.
-
 BEGIN{
     t=0
     intervals="0 10  60 3600 86400 2628000 31536000"
@@ -17,6 +12,7 @@ BEGIN{
     pipe="/tmp/wrtbwmon.pipe"
     numHosts=0
     samples=0
+    zeros=""
 }
 
 function addEntry(t, _in, _out, entryFile){
@@ -92,17 +88,24 @@ function compact(host,  i){
 }
 
 function dump(){
+    for(host in hosts)
+	if(!(host in zeros) && !(host in db_in)){
+	    addEntry(t, 0, 0, "./" host "_" intervalMap[0] ".tsdb")
+	    zeros[host] = ""
+	}
+    
     for(host in db_in){
+	delete zeros[host]
 	if(t-lastCompact[host] >= 10)
 	    compact(host)
 	addEntry(t, db_in[host], db_out[host], "./" host "_" intervalMap[0] ".tsdb")
-	delete db_in[host]
-	delete db_out[host]
 	if(!(host in hosts)){
 	    numHosts++
 	    hosts[host] = ""
 	}
     }
+    delete db_in
+    delete db_out
     samples++
 }
 
