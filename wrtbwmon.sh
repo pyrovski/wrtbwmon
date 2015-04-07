@@ -192,6 +192,16 @@ case $1 in
 	    echo "Warning: failed to detect WAN interface."
 	fi
 
+	if [ -f /tmp/continuous.pid ]; then
+	    if [ -d /proc/$(< /tmp/continuous.pid) ]; then
+		echo "continuous running; abort"
+		exit
+	    else
+		echo "Warning: removing /tmp/continuous.pid"
+		rm -f /tmp/continuous.pid
+	    fi
+	fi
+	
 	lock
 
 	[ "$mode" = "diff" ] && date +%s.%N
