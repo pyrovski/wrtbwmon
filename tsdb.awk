@@ -17,8 +17,7 @@ BEGIN{
     for(i=1; i <= numLabels; i++)
 	intervalMap[s_intervals[i]] = s_labels[i]
     pipe="/tmp/continuous.pipe"
-    numHosts=0
-    samples=0
+    numHosts=samples=0
     zeros=""
 }
 
@@ -140,9 +139,9 @@ function dump(){
 NF==1 && $1 ~ /[0-9]+[.][0-9]+/{
     if(t==0)
 	firstTS=$1
+    dump()
     t=$1
     printf "%s\r", t
-    dump()
     next
 }
 
@@ -157,8 +156,7 @@ NF==1 && $1 == "collect"{
     reqTime=a[2]
     pidPipe = "/tmp/"pid".pipe"
     pidDump = "/tmp/"pid".dump"
-    cmd="awk -v ts="reqTime" -f ./dump.awk *.tsdb > "pidDump
-    system(cmd)
+    system("awk -v ts="reqTime" -f ./dump.awk *.tsdb > "pidDump)
     print pidDump > pidPipe
     close(pidPipe)
     next
@@ -179,6 +177,5 @@ END{
     dump()
     # record timestamp of last realtime entry
     print "tsdb ending"
-    if(t)
-	print t > fLastUpdate
+    if(t) print t > fLastUpdate
 }
