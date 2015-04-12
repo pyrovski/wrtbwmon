@@ -11,36 +11,67 @@ if (!Array.prototype.last){
     }
 }
 
+function parseData(textData, data){
+    newData = JSON.parse(textData)
+    var compacted = {}
+    for(var key in newData){
+	if(newData.hasOwnProperty(key)){
+	    var keySplit = key.split(':')
+	    var host = keySplit[0]
+	    l = newData[key].length
+	    if(l > 1){
+		newData[key] = newData[key].slice(0,l-1)
+	    	for(var i = 0; i < newData[key].length; i++)
+	    	    newData[key][i][0] = new Date(newData[key][i][0] * 1000)
+	    } else
+	    	newData[key] = [[]]
+	    if(host in compacted)
+		compacted[host] = compacted[host].concat(newData[key])
+	    else
+		compacted[host] = newData[key]
+	}
+    }
+    if(data == null)
+	data = {}
+	
+    newData = data
+    for(var host in newData)
+	if(newData.hasOwnProperty(host)){
+	    if(host in compacted){
+		newData[host] =
+		    newData[host].concat(compacted[host]).sort(compareEntries)
+		lastTime =
+		    new Date(Math.max(compacted[host].last()[0], lastTime))
+		delete compacted[host]
+	    }
+	}
+    for(var host in compacted)
+	if(host != undefined && compacted.hasOwnProperty(host))
+	    newData[host] = compacted[host]
+    return newData
+}
+
 function getData(){
     var xmlhttp = new XMLHttpRequest()
     xmlhttp.onreadystatechange=function()
     {
     	if (xmlhttp.readyState==4 && xmlhttp.status==200){
-    	    document.getElementById("data").innerHTML=xmlhttp.responseText
-    	    data=JSON.parse(xmlhttp.responseText)
-	    for(var k in data){
-	    	if(data.hasOwnProperty(k)){
-	    	    l = data[k].length
-	    	    if(l > 1){
-	    		data[k] = data[k].slice(0,l-1).sort(compareEntries)
-	    		for(var i = 0; i < data[k].length; i++)
-	    		    data[k][i][0] = new Date(data[k][i][0] * 1000)
-	    		lastTime = new Date(Math.max(data[k].last()[0], lastTime))
-	    	    } else
-	    		data[k] = [[]]
-	    	}
-	    }
-	    if(data["192.168.1.139"].length > 1){
+    	    data = parseData(xmlhttp.responseText, data)
+    	    document.getElementById("data").innerHTML=JSON.stringify(data)
+	    if("192.168.1.139" in data && data["192.168.1.139"].length > 1){
 		var chart = new google.visualization.AreaChart(document.getElementById('myChart'));
 		dt = [["time","in","out"]].concat(data["192.168.1.139"]).slice(0,data["192.168.1.139"].length)
-		console.debug(dt)
 		dt = google.visualization.arrayToDataTable(dt)
 		
 		chart.draw(dt)
+	    } else {
+		document.getElementById('myChart').innerHTML="no data for 192.168.1.139"
 	    }
     	}
     }
-    xmlhttp.open("GET","/cgi-bin/test?t=".concat(lastTime.getTime()/1000),true)
+    xmlhttp.open("GET",
+		 "/cgi-bin/test?t=".concat(lastTime.getTime()/1000),
+		 true)
     xmlhttp.send()
 }
 
