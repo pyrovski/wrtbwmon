@@ -1,8 +1,7 @@
-<!doctype html>
 <html>
   <head>
-    <script src="test.js"></script>
     <script type="text/javascript" src="https://www.google.com/jsapi"></script>
+    <script type="text/javascript" src="test.js"></script>
     <script type="text/javascript">
       google.load("visualization", "1", {packages:["corechart"]});
       google.setOnLoadCallback(drawChart);
@@ -10,7 +9,7 @@
   </head>
   <body>
     <button onclick="getData()">Get data.</button><br>
-    <canvas id="myChart" width="400" height="400"></canvas>
-    <p><div id="data">asdf</div></p>
+    <div id="myChart" style="width: 900px; height: 500px;"></div>
+    <p><div id="data">asdf</div></p>    
   </body>
-</html>
+  </html>

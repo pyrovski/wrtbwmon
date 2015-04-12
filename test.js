@@ -25,7 +25,7 @@ function getData(){
 }
 
 function drawChart() {
-    var data = google.visualization.arrayToDataTable([
+    var data2 = google.visualization.arrayToDataTable([
 	['Year', 'Sales', 'Expenses'],
 	['2013',  1000,      400],
 	['2014',  1170,      460],
@@ -40,5 +40,5 @@ function drawChart() {
     };
 
     var chart = new google.visualization.AreaChart(document.getElementById('myChart'));
-    chart.draw(data, options);
+    chart.draw(data2, options);
 }
