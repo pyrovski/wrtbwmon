@@ -47,7 +47,7 @@ function parseData(textData, data){
 	}
     for(var host in compacted)
 	if(host != undefined && compacted.hasOwnProperty(host))
-	    newData[host] = compacted[host]
+	    newData[host] = compacted[host].sort(compareEntries)
     return newData
 }
 
@@ -57,9 +57,10 @@ function getData(){
     {
     	if (xmlhttp.readyState==4 && xmlhttp.status==200){
     	    data = parseData(xmlhttp.responseText, data)
-    	    document.getElementById("data").innerHTML=JSON.stringify(data)
+    	    //document.getElementById("data").innerHTML=JSON.stringify(data)
 	    if("192.168.1.139" in data && data["192.168.1.139"].length > 1){
 		var chart = new google.visualization.AreaChart(document.getElementById('myChart'));
+		//!@todo format data into bytes/s instead of bytes, plot rectangles instead of trapezoids
 		dt = [["time","in","out"]].concat(data["192.168.1.139"]).slice(0,data["192.168.1.139"].length)
 		dt = google.visualization.arrayToDataTable(dt)
 		
@@ -73,23 +74,4 @@ function getData(){
 		 "/cgi-bin/test?t=".concat(lastTime.getTime()/1000),
 		 true)
     xmlhttp.send()
-}
-
-function drawChart() {
-    var data2 = google.visualization.arrayToDataTable([
-	['Year', 'Sales', 'Expenses'],
-	['2013',  1000,      400],
-	['2014',  1170,      460],
-	['2015',  660,       1120],
-	['2016',  1030,      540]
-    ]);
-
-    var options = {
-	title: 'Company Performance',
-	hAxis: {title: 'Year',  titleTextStyle: {color: '#333'}},
-	vAxis: {minValue: 0}
-    };
-
-    var chart = new google.visualization.AreaChart(document.getElementById('myChart'));
-    chart.draw(data2, options);
 }
