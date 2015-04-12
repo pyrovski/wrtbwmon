@@ -23,7 +23,6 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 #!@todo add logger
-#!@todo store time series data
 #!@todo reference awk scripts and html templates in predictable location
 
 [ -p /tmp/wrtbwmon.pipe ] || mkfifo /tmp/wrtbwmon.pipe

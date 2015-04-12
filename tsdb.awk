@@ -1,7 +1,14 @@
 #!/usr/bin/awk
 
 BEGIN{
-    t=0
+    fLastUpdate = "/tmp/wrtbwmon.lastUpdate"
+    r=getline t < fLastUpdate
+    close(fLastUpdate)
+    if(r != 1)
+	t=0
+    else
+	firstTS = t
+    
     intervals="0 10  60 3600 86400 2628000 31536000"
     labels   ="r 10s m  h    d     M       y"
     split(intervals, s_intervals)
@@ -19,7 +26,9 @@ function addEntry(t, _in, _out, entryFile){
     print t, _in, _out >> entryFile
 }
 
-function _compact(host, interval, interval2,  i,n,l,a,f){
+function _compact(host, interval, interval2,
+		  n,l,f,fTmp,nextF,nextFirstTS,lastTS)
+{
     key=host "." interval2
     tDiff = t-lastCompact[key]
     if(key in lastCompact && tDiff < interval2){
@@ -29,50 +38,66 @@ function _compact(host, interval, interval2,  i,n,l,a,f){
 #    print "compacting", host, interval, interval2
     lastCompact[key] = t
     f="./" host "_" intervalMap[interval] ".tsdb"
-#    print f
+    fTmp=f".tmp"
+    nextF = "./" host "_" intervalMap[interval2] ".tsdb"
+    r=getline < nextF
+    if(r == 1)
+	nextFirstTS = $1
+    else
+	nextFirstTS = 0
+    close(nextF)
     close(f)
     line=0
     processed=0
+    lastTS=firstTS
     while(1==(r=getline < f)){
 	line++
 	if(NF == 3){
 	    processed++
 	    if(line==1){
-#!@todo technically, this should be the time of the last entry in the
-#!interval2 file
 		lastTS=$1
+		if(!nextFirstTS){
+		    nextFirstTS=lastTS
+		    print nextFirstTS,0,0 > nextF
+		}
 		lastLine=line
 		s_in=s_out=0
 	    }
 	    s_in  += $2
 	    s_out += $3
 	    if($1 - lastTS >= interval2 - interval){
-		nextF = "./" host "_" intervalMap[interval2] ".tsdb"
 		addEntry($1, s_in, s_out, nextF)
-		    print $1, s_in, s_out, nextF
-		    lastTS=$1
-		    s_in=s_out=0
-		    lastLine = line
+		print $1":", lastTS, s_in, s_out, nextF
+		lastTS=$1
+		s_in=s_out=0
+		lastLine = line
 	    }
 	}
     }
     close(f)
     if(processed > 0){
+	close(nextF)
+	print lastTS,0,0 > fTmp
+	close(fTmp)
 	# retain entries not compacted
 	if(lastLine != line){
 #	    print line-lastLine " leftover of " line " entries"
-	    tmpF = "/tmp/"host"_"intervalMap[interval]".tsdb"
-	    cmd = "tail -n +" lastLine+1" "f " > " tmpF " && mv " tmpF " " f" 2>/dev/null"
+	    cmd = "tail -n +" lastLine+1" "f " | uniq >> " fTmp " 2>/dev/null"
 	    system(cmd)
-	} else
-	    system("rm -f " f)
+	}
+	system("mv " fTmp " " f)
 	return(0)
-    } else
-	# no lines processed, so next compaction doesn't need to run
+    } else {
+	# no lines processed, so next compaction doesn't need to run,
+	# but we need to add an initial timestamp to the file
+	print lastTS,0,0 > f
 	return(1)
+    }
 }
 
-function compact(host,  i){
+function compact(host,
+		 i, r)
+{
     if(lastCompact[host]){
 	print "compacting " host " at time " t ": " t-lastCompact[host] "s"
     } else {
@@ -80,10 +105,8 @@ function compact(host,  i){
     }
     r=0
     for(i=1; i < numLabels; i++)
-	if(!r){
+	if(!r)
 	    r=_compact(host, s_intervals[i], s_intervals[i+1])
-	    #if(s_intervals[i+1] ...)
-	}
     lastCompact[host] = t
 }
 
@@ -98,11 +121,15 @@ function dump(){
 	delete zeros[host]
 	if(t-lastCompact[host] >= 10)
 	    compact(host)
-	addEntry(t, db_in[host], db_out[host], "./" host "_" intervalMap[0] ".tsdb")
 	if(!(host in hosts)){
 	    numHosts++
 	    hosts[host] = ""
 	}
+	if(!(host in db_out))
+	    db_out[host] = 0
+	# entries should be tagged with the end time of the interval
+	addEntry(t, db_in[host], db_out[host],
+		 "./" host "_" intervalMap[0] ".tsdb")
     }
     delete db_in
     delete db_out
@@ -120,9 +147,9 @@ NF==1 && $1 ~ /[0-9]+[.][0-9]+/{
 }
 
 NF==1 && $1 == "collect"{
-    #!@todo we really just need to pause here and provide a consistent
-    # copy of the on-disk data. This would also be faster if we kept a
-    # copy in awk.
+    # we really just need to pause here and provide a consistent copy
+    # of the on-disk data. This would also be faster if we kept a copy
+    # in awk.
     print t, "collect!\n"
     getline pid < pipe
     split(pid, a, " ")
@@ -131,15 +158,12 @@ NF==1 && $1 == "collect"{
     pidPipe = "/tmp/"pid".pipe"
     pidDump = "/tmp/"pid".dump"
     cmd="awk -v ts="reqTime" -f ./dump.awk *.tsdb > "pidDump
-    print pidDump > pidPipe
     system(cmd)
+    print pidDump > pidPipe
     close(pidPipe)
     next
 }
-NF==1 && $1 == "stats"{
-    duration=t-firstTS
-    print "\n"samples" samples in "duration"s: "samples/duration"/s"
-}
+
 {
     split($1, a, "/")
     host = a[1]
@@ -148,8 +172,13 @@ NF==1 && $1 == "stats"{
 	db_in[host] += $2
     else
 	db_out[host] += $2
+    next
 }
 
 END{
     dump()
+    # record timestamp of last realtime entry
+    print "tsdb ending"
+    if(t)
+	print t > fLastUpdate
 }
