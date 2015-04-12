@@ -26,6 +26,8 @@
 #!@todo store time series data
 #!@todo reference awk scripts and html templates in predictable location
 
+[ -p /tmp/wrtbwmon.pipe ] || mkfifo /tmp/wrtbwmon.pipe
+
 trap "rm -f /tmp/*$$.tmp; kill -SIGINT $$" SIGINT
 baseDir=/mnt/cifs2
 
@@ -221,9 +223,24 @@ case $1 in
 	
 	# first do some number crunching - rewrite the database so that it is sorted
 	#!@todo publishing doesn't need a lock, it needs a stable copy of the db. If continuous is running, send a signal to make a copy.
-	lock
+	read pid < /tmp/continuous.pid
+	if [ $? -eq 0 -a -n "$pid" -a -d "/proc/$pid" ]; then
+	    echo "got $pid for continuous"
+	    DB=$DB.tmp
+	    kill -SIGUSR2 $pid
+	    read < /tmp/wrtbwmon.pipe
+	else
+	    pid=''
+	    lock
+	fi
+	
 	grep -v '^#' $DB | awk -F, '{OFS=","; a=$4; $4=""; print a OFS $0}' | tr -s ',' | sort -rn > /tmp/sorted_$$.tmp
-	unlock
+
+	if [ -n "$pid" ]; then
+	    rm -f $DB
+	else
+	    unlock
+	fi
 
         # create HTML page
 	cp $baseDir/usage.htm1 $3

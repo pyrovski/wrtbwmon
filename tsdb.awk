@@ -9,7 +9,7 @@ BEGIN{
 
     for(i=1; i <= numLabels; i++)
 	intervalMap[s_intervals[i]] = s_labels[i]
-    pipe="/tmp/wrtbwmon.pipe"
+    pipe="/tmp/continuous.pipe"
     numHosts=0
     samples=0
     zeros=""
