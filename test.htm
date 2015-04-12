@@ -2,17 +2,13 @@
 <html>
   <head>
     <script src="test.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/1.0.2/Chart.min.js"></script>
-    <script>
-      function newChart(){
-      var ctx = document.getElementById("myChart").getContext("2d");
-      new Chart(ctx).Line(data2, {
-      bezierCurve: false
-      });
-      }
+    <script type="text/javascript" src="https://www.google.com/jsapi"></script>
+    <script type="text/javascript">
+      google.load("visualization", "1", {packages:["corechart"]});
+      google.setOnLoadCallback(drawChart);
     </script>
   </head>
-  <body onload="newChart()">
+  <body>
     <button onclick="getData()">Get data.</button><br>
     <canvas id="myChart" width="400" height="400"></canvas>
     <p><div id="data">asdf</div></p>
