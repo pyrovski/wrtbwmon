@@ -62,7 +62,7 @@ lock()
     attempts=0
     while [ $attempts -lt 10 ]; do
 	while [ -f /tmp/wrtbwmon.lock -a $attempts -lt 10 ]; do
-	    if [ ! -d /proc/$(< /tmp/wrtbwmon.lock) ]; then
+	    if [ ! -d /proc/$(cat /tmp/wrtbwmon.lock) ]; then
 		echo "WARNING: Lockfile detected but process $(cat /tmp/wrtbwmon.lock) does not exist !"
 		rm -f /tmp/wrtbwmon.lock
 	    else

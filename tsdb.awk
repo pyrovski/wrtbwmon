@@ -1,6 +1,7 @@
 #!/usr/bin/awk
 
 BEGIN{
+    quiet=1
     fLastUpdate = "/tmp/wrtbwmon.lastUpdate"
     r=getline t < fLastUpdate
     close(fLastUpdate)
@@ -16,7 +17,7 @@ BEGIN{
 
     for(i=1; i <= numLabels; i++)
 	intervalMap[s_intervals[i]] = s_labels[i]
-    pipe="/tmp/continuous.pipe"
+    pipe="/tmp/listener.pipe"
     numHosts=samples=0
     zeros=""
 }
@@ -66,7 +67,8 @@ function _compact(host, interval, interval2,
 	    s_out += $3
 	    if($1 - lastTS >= interval2 - interval){
 		addEntry($1, s_in, s_out, nextF)
-		print $1":", lastTS, s_in, s_out, nextF
+		if(!quiet)
+		    print $1":", lastTS, s_in, s_out, nextF
 		lastTS=$1
 		s_in=s_out=0
 		lastLine = line
@@ -98,9 +100,11 @@ function compact(host,
 		 i, r)
 {
     if(lastCompact[host]){
-	print "compacting " host " at time " t ": " t-lastCompact[host] "s"
+	if(!quiet)
+	    print "compacting " host " at time " t ": " t-lastCompact[host] "s"
     } else {
-	print "first compaction for " host
+	if(!quiet)
+	    print "first compaction for " host
     }
     r=0
     for(i=1; i < numLabels; i++)
@@ -141,7 +145,8 @@ NF==1 && $1 ~ /[0-9]+[.][0-9]+/{
 	firstTS=$1
     dump()
     t=$1
-    printf "%s\r", t
+    if(!quiet)
+	printf "%s\r", t
     next
 }
 

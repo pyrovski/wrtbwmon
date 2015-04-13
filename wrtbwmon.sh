@@ -53,7 +53,7 @@ case $1 in
 	fi
 
 	if [ -f /tmp/continuous.pid ]; then
-	    if [ -d /proc/$(< /tmp/continuous.pid) ]; then
+	    if [ -d /proc/$(cat /tmp/continuous.pid) ]; then
 		echo "continuous running; abort"
 		exit
 	    else
