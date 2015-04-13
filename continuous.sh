@@ -25,7 +25,7 @@ listen()
     while [ $go -eq 1 ]; do
 	if [ $listenerReady -eq 0 ]; then
 	    updatePID listener
-	    read myPID < /tmp/listener.pid
+	    #read myPID < /tmp/listener.pid
 	    trap 'go=0; echo $PPID' SIGUSR1 SIGINT
 	    listenerReady=1
 	fi

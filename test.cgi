@@ -22,24 +22,24 @@ t=`echo "$QUERY_STRING" | sed -r 's/(^|.*,)t=([0-9]+([.][0-9]+)*).*/\2/'`
 ) > /tmp/continuous.pipe &
 pipesPID=$!
 
-elapsed=0
-(
-    while [ $go -eq 1 -a $elapsed -lt 10 ]; do
-	trap 'go=0' SIGTERM
-	sleep 1;
-	elapsed=$((elapsed+1))
-    done
-    if [ $go -eq 0 ]; then
-	exit
-    fi
-    kill $pipesPID) &
-timerPID=$!
+#elapsed=0
+#(
+#    while [ $go -eq 1 -a $elapsed -lt 10 ]; do
+#	trap 'go=0' SIGTERM
+#	sleep 1;
+#	elapsed=$((elapsed+1))
+#    done
+#    if [ $go -eq 0 ]; then
+#	exit
+#    fi
+#    kill $pipesPID) &
+#timerPID=$!
 wait $pipesPID
 if [ ! -f /tmp/$$.dump ]; then
     >&2 echo "$$ no dump"
-    kill $timerPID; wait
+#    kill $timerPID; wait
     exit 1
 fi
 gzip -c /tmp/$$.dump
-kill $timerPID; wait
-rm -f /tmp/$$.*
+#kill $timerPID; wait
+rm -f /tmp/$$.{pipe,dump}
