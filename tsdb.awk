@@ -1,5 +1,11 @@
 #!/usr/bin/awk
 
+#!@todo when a client requests data past a point in time, how do we
+#ensure that they don't receive duplicate data or miss an interval?
+#One approach would be to assume that client updates will occur within
+#a few seconds of each other, and always keep a few seconds of
+#realtime data around without compaction.
+
 BEGIN{
     quiet=1
     fLastUpdate = "/tmp/wrtbwmon.lastUpdate"
