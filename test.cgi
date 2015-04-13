@@ -15,20 +15,31 @@ continuousPID=`cat /tmp/continuous.pid`
 t=`echo "$QUERY_STRING" | sed -r 's/(^|.*,)t=([0-9]+([.][0-9]+)*).*/\2/'`
 
 [ -p /tmp/continuous.pipe ] || exit 1
-(echo "$$ $t"; read < /tmp/$$.pipe) > /tmp/continuous.pipe &
+(echo "$$ $t"
+ while true; do
+     read < /tmp/$$.pipe && break
+ done
+) > /tmp/continuous.pipe &
 pipesPID=$!
 
 elapsed=0
-(while [ $go -eq 1 -a $elapsed -lt 10 ]; do
-     sleep 1;
-     elapsed=$((elapsed+1))
- done
- kill $pipesPID) &
+(
+    while [ $go -eq 1 -a $elapsed -lt 10 ]; do
+	trap 'go=0' SIGTERM
+	sleep 1;
+	elapsed=$((elapsed+1))
+    done
+    if [ $go -eq 0 ]; then
+	exit
+    fi
+    kill $pipesPID) &
 timerPID=$!
 wait $pipesPID
-#>&2 echo "wait: $?"
-[ -f /tmp/$$.dump ] || exit 1
+if [ ! -f /tmp/$$.dump ]; then
+    >&2 echo "$$ no dump"
+    kill $timerPID; wait
+    exit 1
+fi
 gzip -c /tmp/$$.dump
-kill $timerPID
-wait
+kill $timerPID; wait
 rm -f /tmp/$$.*
