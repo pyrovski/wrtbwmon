@@ -30,8 +30,7 @@ listen()
 	    listenerReady=1
 	fi
 	read clientPID ts 2>/dev/null < /tmp/continuous.pipe
-	readStatus=$?
-	if [ $readStatus -ne 0 ]; then
+	if [ $? -ne 0 ]; then
 	    [ $go -ne 1 ] && break
 	    continue
 	fi
