@@ -61,19 +61,16 @@ lock()
 {
     attempts=0
     while [ $attempts -lt 10 ]; do
-	while [ -f /tmp/wrtbwmon.lock -a $attempts -lt 10 ]; do
-	    if [ ! -d /proc/$(cat /tmp/wrtbwmon.lock) ]; then
-		echo "WARNING: Lockfile detected but process $(cat /tmp/wrtbwmon.lock) does not exist !"
-		rm -f /tmp/wrtbwmon.lock
+	mkdir /tmp/wrtbwmon.lock && break
+	attempts=$((attempts+1))
+	if [ -d /tmp/wrtbwmon.lock ]; then
+	    if [ ! -d /proc/$(cat /tmp/wrtbwmon.lock/pid) ]; then
+		echo "WARNING: Lockfile detected but process $(cat /tmp/wrtbwmon.lock/pid) does not exist !"
+		rm -rf /tmp/wrtbwmon.lock
 	    else
 		sleep 1
-		attempts=$((attempts+1))
 	    fi
-	done
-	echo $$ > /tmp/wrtbwmon.lock
-	read lockPID < /tmp/wrtbwmon.lock
-	[[ $$ -eq "$lockPID" ]] && break;
-	attempts=$((attempts+1))
+	fi
     done
     #[[ -n "$DEBUG" ]] && echo $$ "got lock after $attempts attempts"
     oldTrap=$(trap | grep SIGINT | sed 's/.* -- //')
@@ -82,7 +79,7 @@ lock()
 
 unlock()
 {
-    rm -f /tmp/wrtbwmon.lock
+    rm -rf /tmp/wrtbwmon.lock
     #[[ -n "$DEBUG" ]] && echo $$ "released lock"
     trap "$oldTrap"
 }
