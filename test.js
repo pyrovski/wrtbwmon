@@ -1,6 +1,10 @@
 var lastTime = new Date(0)
 var data=null
 
+function copy(obj){
+    return JSON.parse(JSON.stringify(obj))
+}
+
 function compareEntries(a, b){
     return (a[0] >= b[0] ? (a[0] == b[0] ? 0 : 1) : -1)
 }
@@ -51,6 +55,10 @@ function parseData(textData, data){
 	if(newData.hasOwnProperty(host) && newData[host].length > 0){
 	    lastTime =
 		new Date(Math.max(newData[host].last()[0], lastTime))
+	    // remove duplicate timestamps (mostly zeros?)
+	    newData[host] = newData[host].filter(function(v,i,a){
+		return i == 0 || a[i-1][0].getTime() != a[i][0].getTime()
+	    })
 	}
     return newData
 }
@@ -73,7 +81,21 @@ function getData(){
 	    if("192.168.1.139" in data && data["192.168.1.139"].length > 1){
 		var chart = new google.visualization.AreaChart(document.getElementById('myChart'));
 		//!@todo format data into bytes/s instead of bytes, plot rectangles instead of trapezoids
-		dt = [["time","in","out"]].concat(data["192.168.1.139"])
+		hostData = data["192.168.1.139"]
+		bars = []
+		for(i = 1; i < hostData.length; i++){
+		    endBar = copy(hostData[i])
+		    endBar[0] = new Date(endBar[0])
+		    startTime = new Date(hostData[i-1][0])
+		    tDiff = (endBar[0] - startTime)/1000
+		    endBar[1]/=tDiff
+		    endBar[2]/=tDiff
+		    startBar = copy(endBar)
+		    startBar[0] = startTime
+		    bars.push(startBar)
+		    bars.push(endBar)
+		}
+		dt = [["time","in","out"]].concat(bars)
 		dt = google.visualization.arrayToDataTable(dt)
 		
 		chart.draw(dt)
