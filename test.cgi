@@ -25,9 +25,9 @@ elapsed=0
  done
  kill $pipesPID) &
 timerPID=$!
-#>&2 echo "waiting for $pipesPID"
 wait $pipesPID
 #>&2 echo "wait: $?"
+[ -f /tmp/$$.dump ] || exit 1
 gzip -c /tmp/$$.dump
 kill $timerPID
 wait
