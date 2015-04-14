@@ -1,6 +1,23 @@
 var lastTime = new Date(0)
 var data=null
 
+function toBars(hostData){
+    bars = []
+    for(i = 1; i < hostData.length; i++){
+	endBar = copy(hostData[i])
+	endBar[0] = new Date(endBar[0])
+	startTime = new Date(hostData[i-1][0])
+	tDiff = (endBar[0] - startTime)/1000
+	endBar[1]/=tDiff
+	endBar[2]/=tDiff
+	startBar = copy(endBar)
+	startBar[0] = startTime
+	bars.push(startBar)
+	bars.push(endBar)
+    }
+    return bars
+}
+
 function copy(obj){
     return JSON.parse(JSON.stringify(obj))
 }
@@ -72,6 +89,22 @@ function parseData(textData, data){
     return newData
 }
 
+function drawChart(host){
+    if(host in data && data[host].length > 1){
+	var chart = new google.visualization.AreaChart(document.getElementById('myChart'));
+	//!@todo format data into bytes/s instead of bytes, plot rectangles instead of trapezoids
+	bars = toBars(data[host])
+	dt = [["time","in","out"]].concat(bars)
+	dt = google.visualization.arrayToDataTable(dt)
+
+	var options = {explorer:{}}
+	chart.draw(dt, options)
+    } else {
+	document.getElementById('myChart').innerHTML="no data for " + host
+    }
+
+}
+
 function getData(){
     var xmlhttp = new XMLHttpRequest()
     xmlhttp.onreadystatechange=function()
@@ -85,32 +118,17 @@ function getData(){
 		    if(data.hasOwnProperty(host))
 			oldLastTime = new Date(Math.min(data[host][0][0], oldLastTime))
 	    }
+	    hosts=[]
+	    for(var host in data)
+		if(data.hasOwnProperty(host))
+		    hosts.push(host)
+	    hostsString = ""
+	    for(i = 0; i < hosts.length; i++)
+		hostsString = hostsString + "<option value=\"" + hosts[i] + "\">" + hosts[i] + "</option>"
+	    //!@todo avoid unselecting previous selection when new data is loaded
+	    //!@todo redraw chart for the selected host when loading new data
+	    document.getElementById("hosts").innerHTML="<select onchange=\"drawChart(this.value)\">"+hostsString+"</select>"
 	    document.getElementById("data").innerHTML="got " + (lastTime - oldLastTime)/1000 + " s of data"
-
-	    if("192.168.1.139" in data && data["192.168.1.139"].length > 1){
-		var chart = new google.visualization.AreaChart(document.getElementById('myChart'));
-		//!@todo format data into bytes/s instead of bytes, plot rectangles instead of trapezoids
-		hostData = data["192.168.1.139"]
-		bars = []
-		for(i = 1; i < hostData.length; i++){
-		    endBar = copy(hostData[i])
-		    endBar[0] = new Date(endBar[0])
-		    startTime = new Date(hostData[i-1][0])
-		    tDiff = (endBar[0] - startTime)/1000
-		    endBar[1]/=tDiff
-		    endBar[2]/=tDiff
-		    startBar = copy(endBar)
-		    startBar[0] = startTime
-		    bars.push(startBar)
-		    bars.push(endBar)
-		}
-		dt = [["time","in","out"]].concat(bars)
-		dt = google.visualization.arrayToDataTable(dt)
-		
-		chart.draw(dt)
-	    } else {
-		document.getElementById('myChart').innerHTML="no data for 192.168.1.139"
-	    }
     	}
     }
     xmlhttp.open("GET",
