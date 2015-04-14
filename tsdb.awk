@@ -167,6 +167,7 @@ NF==1 && $1 == "collect"{
     reqTime=a[2]
     pidPipe = "/tmp/"pid".pipe"
     pidDump = "/tmp/"pid".dump"
+    #!@todo use names from device list to label host data
     system("awk -v ts="reqTime" -f ./dump.awk *.tsdb > "pidDump)
     print pidDump > pidPipe
     close(pidPipe)
