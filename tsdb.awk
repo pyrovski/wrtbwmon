@@ -32,6 +32,7 @@ function addEntry(t, _in, _out, entryFile){
     print t, _in, _out >> entryFile
 }
 
+#!@todo store max, median for each interval in files for longer intervals?
 function _compact(host, interval, interval2,
 		  n,l,f,fTmp,nextF,nextFirstTS,lastTS)
 {
