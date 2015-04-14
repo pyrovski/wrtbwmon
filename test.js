@@ -6,7 +6,16 @@ function copy(obj){
 }
 
 function compareEntries(a, b){
-    return (a[0] >= b[0] ? (a[0] == b[0] ? 0 : 1) : -1)
+    if(a[0] > b[0])
+	return 1
+    if(a[0] < b[0])
+	return -1
+    if(a[1] && !b[1] || a[2] && !b[2])
+	return 1
+    if(!a[1] && b[1] || !a[2] && b[2])
+	return -1
+    // times are equal, but traffic data may not be
+    return 0
 }
 
 if (!Array.prototype.last){
@@ -57,7 +66,7 @@ function parseData(textData, data){
 		new Date(Math.max(newData[host].last()[0], lastTime))
 	    // remove duplicate timestamps (mostly zeros?)
 	    newData[host] = newData[host].filter(function(v,i,a){
-		return i == 0 || a[i-1][0].getTime() != a[i][0].getTime()
+		return i == a.length-1 || a[i+1][0].getTime() != a[i][0].getTime()
 	    })
 	}
     return newData
