@@ -81,16 +81,16 @@ fid==3 && rrd && (NF < 9 || $1=="pkts"){ next }
 # iptables input
 fid==3 && rrd && $2 > 0{
     if($6 != "*"){
-	n=$6 "/in"
+	n=$6 "/out"
 	m=$6
     } else if($7 != "*"){
-	n=$7 "/out"
+	n=$7 "/in"
 	m=$7
     } else if($8 != "0.0.0.0/0"){
-	n=$8 "/in"
+	n=$8 "/out"
 	m=$8
-    } else {
-	n=$9 "/out"
+    } else { # $9 != "0.0.0.0/0"
+	n=$9 "/in"
 	m=$9
     }
     #!@todo offpeak
