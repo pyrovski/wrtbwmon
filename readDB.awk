@@ -1,3 +1,9 @@
+
+function newRule(arp_ip){
+	system("iptables -t mangle -I RRDIPT_FORWARD -d " arp_ip " -j RETURN")
+	system("iptables -t mangle -I RRDIPT_FORWARD -s " arp_ip " -j RETURN")
+}
+
 function total(i){
     return(bwp[i "/in"] + bwp[i "/out"] + bwo[i "/in"] + bwo[i "/out"])
 }
@@ -29,6 +35,7 @@ FNR==NR {
 	#!@todo could get interface IP here
 	$2=$1
     n=$2
+    hosts[n] = ""
     mac[n]        =  $1
     ip[n]         =  $2
     inter[n]      =  $3
@@ -58,8 +65,7 @@ fid==2 {
 	if(debug)
 	    print "new host:", arp_ip, arp_flags > "/dev/stderr"
 	# new host; add rule
-	"iptables -t mangle -I RRDIPT_FORWARD -d " arp_ip " -j RETURN"
-	"iptables -t mangle -I RRDIPT_FORWARD -s " arp_ip " -j RETURN"
+	newRule(arp_ip)
 	mac[arp_ip]   = arp_mac
 	ip[arp_ip]    = arp_ip
 	inter[arp_ip] = arp_dev
@@ -79,7 +85,8 @@ fid==3 && $1 == "Chain"{
 fid==3 && rrd && (NF < 9 || $1=="pkts"){ next }
 
 # iptables input
-fid==3 && rrd && $2 > 0{
+#!@todo if we read this first, the need for new rules will not have to wait until END
+fid==3 && rrd {
     if($6 != "*"){
 	n=$6 "/out"
 	m=$6
@@ -93,14 +100,17 @@ fid==3 && rrd && $2 > 0{
 	n=$9 "/in"
 	m=$9
     }
-    #!@todo offpeak
-    if(mode == "diff" || mode == "noUpdate")
-	print n, $2
-    if(mode!="noUpdate"){
-	bwp[n]+=$2
-	# compare label to wan input variable
-	if(m == wan) m = "(WAN)"
-	lastDate[m] = date()
+    delete hosts[m]
+    if($2 > 0){
+	#!@todo offpeak
+	if(mode == "diff" || mode == "noUpdate")
+	    print n, $2
+	if(mode!="noUpdate"){
+	    bwp[n]+=$2
+	    # compare label to wan input variable
+	    if(m == wan) m = "(WAN)"
+	    lastDate[m] = date()
+	}
     }
 }
 
@@ -112,4 +122,8 @@ END {
     OFS=","
     for(i in mac)
 	print mac[i], ip[i], inter[i], bwp[i "/in"], bwp[i "/out"], bwo[i "/in"], bwo[i "/out"], total(i), firstDate[i], lastDate[i] > dbFile
+
+    # for hosts without rules
+    for(host in hosts)
+	newRule(host)
 }
