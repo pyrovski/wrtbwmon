@@ -97,8 +97,9 @@ case $1 in
 	    pid=''
 	    lock
 	fi
-	
-	grep -v '^#' $DB | awk -F, '{OFS=","; a=$4; $4=""; print a OFS $0}' | tr -s ',' | sort -rn > /tmp/sorted_$$.tmp
+
+	# busybox sort truncates numbers to 32 bits
+	grep -v '^#' $DB | awk -F, '{OFS=","; a=sprintf("%f",$4/1e6); $4=""; print a,$0}' | tr -s ',' | sort -rn | awk -F, '{OFS=",";$1=sprintf("%f",$1*1e6);print}' > /tmp/sorted_$$.tmp
 
 	if [ -n "$pid" ]; then
 	    rm -f $DB
