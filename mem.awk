@@ -107,9 +107,9 @@ function dumpJSON(ts, toPipe,
 	    print "\"" host ":" period "\":[" > toPipe
 	    hostPeriod = host","period
 	    if(times[hostPeriod","samples[hostPeriod]] <= ts){
+		print "0]" > toPipe
 		continue
 	    }
-
 	    for(sample=minSample[hostPeriod]; sample <= samples[hostPeriod]; sample++){
 		hostIndex = hostPeriod","sample
 		if(times[hostIndex] <= ts){
@@ -118,7 +118,7 @@ function dumpJSON(ts, toPipe,
 		}
 		print "["times[hostIndex], inBytes[hostIndex], outBytes[hostIndex]"]," > toPipe
 	    }
-	    print ",0]" > toPipe
+	    print "0]" > toPipe
 	}
     }
     print "}" > toPipe
@@ -183,7 +183,7 @@ FNR==1{
     }
 }
 
-$1 > 0{
+NF == 3 && $1 > 0{
     hostIndex = hostPeriod "," (++samples[hostPeriod])
     times[hostIndex] = $1
     inBytes[hostIndex] = $2
