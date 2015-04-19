@@ -37,17 +37,18 @@ function compact(host,
 }
 
 function dump(ts, toPipe,
-	      host, i, period, hostPeriod, sample, hostIndex)
+	      host, printCount, i, period, hostPeriod, sample, hostIndex)
 {
+    printCount = 0
     for(host in hosts){
-	print host > toPipe
-	#compact(host)
 	for(i=numLabels; i >= 1; i--){
 	    period = s_labels[i]
-#	    print "period: " period
+	    if(printCount)
+		printf "," > toPipe
+	    print "\""host":"period"\":[" > toPipe
+	    printCount++
 	    hostPeriod = host","period
 	    if(times[hostPeriod","samples[hostPeriod]] <= ts){
-#		print "skipping "period" for host "host > "/dev/stderr"
 		continue
 	    }
 	    
@@ -57,8 +58,9 @@ function dump(ts, toPipe,
 		    #!@todo could do a binary search for the start time
 		    continue
 		}
-		print times[hostIndex], inBytes[hostIndex], outBytes[hostIndex] > toPipe
+		print "["times[hostIndex], inBytes[hostIndex], outBytes[hostIndex]"]," > toPipe
 	    }
+	    print ",0]" > toPipe
 	}
     }
 }
@@ -87,26 +89,26 @@ FNR==1{
 	if(!(hostPeriod in samples)){
 	    samples[hostPeriod] = 0
 	}
-	tsdbF = 1
-    } else
-	tsdbF = 0
+    }
 }
 
-tsdbF{
-    samples[hostPeriod]++
-    hostIndex = hostPeriod","samples[hostPeriod]
+{    
+    hostIndex = hostPeriod "," ++samples[hostPeriod]
     times[hostIndex] = $1
     inBytes[hostIndex] = $2
     outBytes[hostIndex] = $3
-    next
 }
 
 END{
+    OFS=","
     while(1){
 	getline < "/tmp/pipe"
 	print $0
 	dump($1, $2)
 	close($2)
+	for(host in hosts){
+	    #compact(host)
+	}
     }
 #    dump(0, "/dev/stdout")
 }
