@@ -36,9 +36,11 @@ function compact(host,
     }
 }
 
-function dump(ts, toPipe,
-	      host, printCount, i, period, hostPeriod, sample, hostIndex)
+function dumpJSON(ts, toPipe,
+		  host, printCount, i, period, hostPeriod, sample, hostIndex)
 {
+    
+    OFS=","
     print "{" > toPipe
     printCount = 0
     for(host in hosts){
@@ -64,6 +66,24 @@ function dump(ts, toPipe,
 	}
     }
     print "}" > toPipe
+    OFS=" "
+}
+
+function dump(  f, host, i, period, hostPeriod, sample, hostIndex)
+{
+    for(host in hosts){
+	for(i=numLabels; i >= 1; i--){
+	    period = s_labels[i]
+	    f = host "_" period ".tsdb"
+	    hostPeriod = host","period
+	    
+	    for(sample=minSample[hostPeriod]; sample <= samples[hostPeriod]; sample++){
+		hostIndex = hostPeriod","sample
+		print times[hostIndex], inBytes[hostIndex], outBytes[hostIndex] > f
+	    }
+	    close(f)
+	}
+    }
 }
 
 BEGIN{
@@ -93,7 +113,7 @@ FNR==1{
     }
 }
 
-{
+$1 > 0{
     hostIndex = hostPeriod "," (++samples[hostPeriod])
     times[hostIndex] = $1
     inBytes[hostIndex] = $2
@@ -101,14 +121,16 @@ FNR==1{
 }
 
 END{
-    OFS=","
     while(1){
 	getline < "/tmp/pipe"
-	print $0
-	dump($1, $2)
-	close($2)
-	#for(host in hosts){
-	    #compact(host)
-	#}
+	if(NF == 2){
+	    print $0
+	    dumpJSON($1, $2)
+	    close($2)
+	} else {
+	    for(host in hosts)
+		compact(host)
+	    dump()
+	}
     }
 }
