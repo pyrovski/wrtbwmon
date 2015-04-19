@@ -1,3 +1,16 @@
+function newEntry(i, time, inB, outB){
+    times[i] = time
+    inBytes[i] = inB
+    outBytes[i] = outB
+}
+
+function date(){
+    cmd="date +%s.%N"
+    cmd | getline d
+    close(cmd)
+    return(d)
+}
+
 function newHost(host, i){
     hosts[host] = ""
     for(i = 1; i < numLabels; i++)
@@ -15,8 +28,8 @@ function command(a, host, dir, f){
 	    if(t != lastReadTS[host]){
 		++samples[hostPeriod]
 		hostIndex = hostPeriod","samples[hostPeriod]
-		times[hostIndex] = lastReadTS[host] = t
-		inBytes[hostIndex] = outBytes[hostIndex] = 0
+		lastReadTS[host] = t
+		newEntry(hostIndex, t, 0, 0)
 #		print minSample[hostPeriod],samples[hostPeriod], $0
 	    } else
 		hostIndex = hostPeriod","samples[hostPeriod]
@@ -36,10 +49,10 @@ function command(a, host, dir, f){
 	if($1 == "dump"){
 	    if(t) print totalSamples/(t-firstTS) "/s"
 	    for(host in hosts)
-		compact(host)
+		compact(host, 0)
 	    dump()
+	    exit
 	} else if($1 ~ /[0-9]+[.][0-9]+/){
-	    if(t==0) firstTS=$1
 	    t=$1
 	    totalSamples++
 	} else if($1 == "exit"){
@@ -50,9 +63,9 @@ function command(a, host, dir, f){
 }
 
 function _compact(host, intervalIndex,
-		 hostIndex, hostNextIndex, hostPeriod, hostNextPeriod, period,
-		 inTotal, outTotal, lastTS, ts, sample, dSample,
-		  nextSamples, compacted)
+		  hostIndex, hostNextIndex, hostPeriod, hostNextPeriod, period,
+		  inTotal, outTotal, lastTS, ts, sample, dSample,
+		  compacted)
 {
     # start at the end of the realtime array, compact.
 
@@ -60,29 +73,37 @@ function _compact(host, intervalIndex,
     # doesn't maintain an interval start entry at the head of each
     # period. The only change that should be necessary is to make sure
     # that new hosts get a zero entry before their first measurement.
+
+    if(host == "192.168.1.133")
+	print "compacting " host " " s_labels[intervalIndex] "(" s_intervals[intervalIndex] ") to " s_labels[intervalIndex+1] "(" s_intervals[intervalIndex+1] ")"
     period = s_labels[intervalIndex]
     nextPeriod = s_labels[intervalIndex+1]
     hostPeriod = host","period
     hostNextPeriod = host","nextPeriod
-    nextSamples = samples[hostNextPeriod]
     lastIndex = minSample[hostPeriod]-1
-    lastTS = times[hostNextPeriod","nextSamples]
+    if(!samples[hostNextPeriod]){
+	if(host == "192.168.1.133")
+	    print "adding new entry to " nextPeriod ": " lastUpdate
+	newEntry(hostNextPeriod","(samples[hostNextPeriod]++), lastUpdate, 0, 0)
+	lastTS = lastUpdate
+    } else
+	lastTS = times[hostNextPeriod","samples[hostNextPeriod]]
     compacted = 0
     for(sample=lastIndex+1; sample <= samples[hostPeriod]; sample++){
 	hostIndex = hostPeriod","sample
 	ts = times[hostIndex]
+	if(host == "192.168.1.133")
+	    print "sample " sample ": " ts " " inBytes[hostIndex] " " outBytes[hostIndex] " " ts - lastTS
 	inTotal += inBytes[hostIndex]
 	outTotal += outBytes[hostIndex]
 	if(ts - lastTS >= s_intervals[intervalIndex+1]){
 	    compacted = 1
-	    nextSamples = ++samples[hostNextPeriod]
-	    hostNextIndex = hostNextPeriod","nextSamples
-	    times[hostNextIndex] = lastTS = ts
-	    inBytes[hostNextIndex] = inTotal
-	    outBytes[hostNextIndex] = outTotal
+	    hostNextIndex = hostNextPeriod","(++samples[hostNextPeriod])
+	    newEntry(hostNextIndex, lastTS=ts, inTotal, outTotal)
 	    inTotal = outTotal = 0
 	    for(dSample=lastIndex+1; dSample <= sample; dSample++){
 		hostIndex = hostPeriod","dSample
+		#!@todo this doesn't seem to free up any memory.
 		delete times[hostIndex]
 		delete inBytes[hostIndex]
 		delete outBytes[hostIndex]
@@ -91,20 +112,20 @@ function _compact(host, intervalIndex,
 	    lastIndex = sample
 	}
     }
+    if(host == "192.168.1.133")
+	print compacted
     return(!compacted)
 }
 
-function compact(host,
+function compact(host, force,
 		 i){
     for(i=1; i < numLabels; i++)
-	if(_compact(host, i))
-	    break
+	if(_compact(host, i) && !force) break
 }
 
 function dumpJSON(ts, toPipe,
 		  host, printCount, i, period, hostPeriod, sample, hostIndex)
-{
-    
+{    
     OFS=","
     print "{" > toPipe
     printCount = 0
@@ -141,6 +162,7 @@ function dump(  f, host, i, period, hostPeriod, sample, hostIndex)
 	for(i=numLabels; i >= 1; i--){
 	    period = s_labels[i]
 	    f = host "_" period ".tsdb"
+	    close(f)
 	    hostPeriod = host","period
 	    
 	    for(sample=minSample[hostPeriod]; sample <= samples[hostPeriod]; sample++){
@@ -154,15 +176,16 @@ function dump(  f, host, i, period, hostPeriod, sample, hostIndex)
 }
 
 BEGIN{
-    quiet=1
+    if(!getline < "/tmp/continuous.pid"){
+	reallyExit=1
+	exit
+    }
+    t = firstTS = date()
     fLastUpdate = "/tmp/wrtbwmon.lastUpdate"
-#    r=getline t < fLastUpdate
-#    close(fLastUpdate)
-#    if(r != 1)
-	t=0
-#    else
-#	firstTS = t
-
+    if(1 != getline lastUpdate < fLastUpdate)
+	lastUpdate = firstTS
+    close(fLastUpdate)
+    
     intervals="0 10  60 3600 86400 2628000 31536000"
     labels   ="r 10s m  h    d     M       y"
     split(intervals, s_intervals)
@@ -173,13 +196,14 @@ BEGIN{
     #!@todo support zeros as in tsdb.awk
     #zeros=""
     totalSamples = 0
-    if(ARGC == 1)
-	exit
+    if(ARGC == 1) exit
 }
 
 FNR==1{
     if(FILENAME ~ /.*_.+[.]tsdb/){
-	split(FILENAME, f, "_")
+	n = split(FILENAME, f, "/")
+	f = f[n]
+	split(f, f, "_")
 	host = f[1]
 	if(!(host in hosts))
 	    newHost(host)
@@ -194,14 +218,15 @@ FNR==1{
 }
 
 NF == 3 && $1 > 0{
-    hostIndex = hostPeriod "," (++samples[hostPeriod])
-    times[hostIndex] = $1
-    inBytes[hostIndex] = $2
-    outBytes[hostIndex] = $3
+    newEntry(hostIndex = hostPeriod "," (++samples[hostPeriod]),
+	     $1, $2, $3)
     next
 }
 
 END{
+    if(reallyExit) exit
+    for(host in hosts)
+	compact(host, 1)
     print "commands"
     while(1){
 	getline < pipe
