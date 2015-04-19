@@ -1,18 +1,30 @@
+function newHost(host, i){
+    hosts[host] = ""
+    for(i = 1; i < numLabels; i++)
+	minSample[host","s_labels[i]] = 1
+}
+
 function command(a, host, dir, f){
     if(NF == 2){
 	if($1 ~ /\//){
 	    split($1, a, "/")
 	    host = a[1]
+	    if(!(host in hosts))
+		newHost(host)
+	    hostPeriod = host",r"
 	    if(t != lastReadTS[host]){
-		++samples[host",r"]
-		lastReadTS[host] = t
-	    }
-	    hostIndex = host",r,"samples[host",r"]
+		++samples[hostPeriod]
+		hostIndex = hostPeriod","samples[hostPeriod]
+		times[hostIndex] = lastReadTS[host] = t
+		inBytes[hostIndex] = outBytes[hostIndex] = 0
+		print minSample[hostPeriod],samples[hostPeriod], $0
+	    } else
+		hostIndex = hostPeriod","samples[hostPeriod]
 	    dir  = a[2]
 	    if(dir == "in")
-		inBytes[hostIndex] = $2
+		inBytes[hostIndex] += $2
 	    else
-		outBytes[hostIndex] = $2
+		outBytes[hostIndex] += $2
 	} else if($2 ~ /[0-9]+([.][0-9]+)?/){
 	    ## pid timestamp
 	    print $0
@@ -22,15 +34,13 @@ function command(a, host, dir, f){
 	}
     } else if(NF == 1){
 	if($1 == "dump"){
-	    print $0
 	    if(t) print totalSamples/(t-firstTS) "/s"
 	    for(host in hosts)
 		compact(host)
 	    dump()
 	} else if($1 ~ /[0-9]+[.][0-9]+/){
-	    if(t==0)
-		firstTS=$1
-	    t=sprintf("%f", $1) + 0
+	    if(t==0) firstTS=$1
+	    t=$1
 	    totalSamples++
 	} else if($1 == "exit"){
 	    dump()
@@ -41,7 +51,7 @@ function command(a, host, dir, f){
 
 function _compact(host, intervalIndex,
 		 hostIndex, hostNextIndex, hostPeriod, hostNextPeriod, period,
-		 inTotal, outTotal, lastTS, ts, sample, dSample, nSamples,
+		 inTotal, outTotal, lastTS, ts, sample, dSample,
 		  nextSamples, compacted)
 {
     # start at the end of the realtime array, compact.
@@ -54,12 +64,11 @@ function _compact(host, intervalIndex,
     nextPeriod = s_labels[intervalIndex+1]
     hostPeriod = host","period
     hostNextPeriod = host","nextPeriod
-    nSamples = samples[hostPeriod]
     nextSamples = samples[hostNextPeriod]
     lastIndex = minSample[hostPeriod]-1
     lastTS = times[hostNextPeriod","nextSamples]
     compacted = 0
-    for(sample=lastIndex+1; sample <= nSamples; sample++){
+    for(sample=lastIndex+1; sample <= samples[hostPeriod]; sample++){
 	hostIndex = hostPeriod","sample
 	ts = times[hostIndex]
 	inTotal += inBytes[hostIndex]
@@ -127,6 +136,7 @@ function dumpJSON(ts, toPipe,
 
 function dump(  f, host, i, period, hostPeriod, sample, hostIndex)
 {
+    print "dump"
     for(host in hosts){
 	for(i=numLabels; i >= 1; i--){
 	    period = s_labels[i]
@@ -163,17 +173,17 @@ BEGIN{
     #!@todo support zeros as in tsdb.awk
     #zeros=""
     totalSamples = 0
+    if(ARGC == 1)
+	exit
 }
 
 FNR==1{
     if(FILENAME ~ /.*_.+[.]tsdb/){
 	split(FILENAME, f, "_")
 	host = f[1]
-	if(!(host in hosts)){
-	    hosts[host] = ""
-	    for(i = 1; i < numLabels; i++)
-		minSample[host","s_labels[i]] = 1
-	}
+	if(!(host in hosts))
+	    newHost(host)
+
 	split(f[2], period, ".")
 	period = period[1]
 	hostPeriod = host","period
@@ -192,6 +202,7 @@ NF == 3 && $1 > 0{
 }
 
 END{
+    print "commands"
     while(1){
 	getline < pipe
 	close(pipe)

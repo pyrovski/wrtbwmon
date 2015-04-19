@@ -22,28 +22,7 @@ fi
 
 [ -p /tmp/continuous.pipe ] || exit 1
 mkfifo /tmp/$$.pipe || exit 1
-echo "$$ $t" > /tmp/continuous.pipe &
-pipesPID=$!
 
-#elapsed=0
-#(
-#    while [ $go -eq 1 -a $elapsed -lt 10 ]; do
-#	trap 'go=0' SIGTERM
-#	sleep 1;
-#	elapsed=$((elapsed+1))
-#    done
-#    if [ $go -eq 0 ]; then
-#	exit
-#    fi
-#    kill $pipesPID) &
-#timerPID=$!
-wait $pipesPID
-#if [ ! -f /tmp/$$.dump ]; then
-#    >&2 echo "$$ no dump"
-#    kill $timerPID; wait
-#    exit 1
-#else
-    gzip -c /tmp/$$.pipe
-#fi
-#kill $timerPID; wait
+echo "$$ $t" > /tmp/continuous.pipe & gzip -c /tmp/$$.pipe
+wait
 rm -f /tmp/$$.pipe
