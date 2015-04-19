@@ -22,9 +22,9 @@ function command(a, host, dir, f){
 	if($1 ~ /\//){
 	    split($1, a, "/")
 	    host = a[1]
+	    hostPeriod = host",r"
 	    if(!(host in hosts))
 		newHost(host)
-	    hostPeriod = host",r"
 	    if(t != lastReadTS[host]){
 		++samples[hostPeriod]
 		hostIndex = hostPeriod","samples[hostPeriod]
@@ -47,7 +47,7 @@ function command(a, host, dir, f){
 	}
     } else if(NF == 1){
 	if($1 == "dump"){
-	    if(t) print totalSamples/(t-firstTS) "/s"
+	    if(t && t != firstTS) print totalSamples/(t-firstTS) "/s"
 	    for(host in hosts)
 		compact(host, 0)
 	    dump()
@@ -74,46 +74,51 @@ function _compact(host, intervalIndex,
     # period. The only change that should be necessary is to make sure
     # that new hosts get a zero entry before their first measurement.
 
-    if(host == "192.168.1.133")
-	print "compacting " host " " s_labels[intervalIndex] "(" s_intervals[intervalIndex] ") to " s_labels[intervalIndex+1] "(" s_intervals[intervalIndex+1] ")"
+#    if(host == "192.168.1.133")
+#	print "compacting " host " " s_labels[intervalIndex] "(" s_intervals[intervalIndex] ") to " s_labels[intervalIndex+1] "(" s_intervals[intervalIndex+1] ")"
     period = s_labels[intervalIndex]
     nextPeriod = s_labels[intervalIndex+1]
     hostPeriod = host","period
     hostNextPeriod = host","nextPeriod
-    lastIndex = minSample[hostPeriod]-1
     if(!samples[hostNextPeriod]){
-	if(host == "192.168.1.133")
-	    print "adding new entry to " nextPeriod ": " lastUpdate
-	newEntry(hostNextPeriod","(samples[hostNextPeriod]++), lastUpdate, 0, 0)
+#	if(host == "192.168.1.133")
+#	    print "adding new entry to " nextPeriod ": " lastUpdate
+	newEntry(hostNextPeriod","(++samples[hostNextPeriod]),
+		 lastUpdate, 0, 0)
 	lastTS = lastUpdate
     } else
 	lastTS = times[hostNextPeriod","samples[hostNextPeriod]]
     compacted = 0
-    for(sample=lastIndex+1; sample <= samples[hostPeriod]; sample++){
-	hostIndex = hostPeriod","sample
-	ts = times[hostIndex]
-	if(host == "192.168.1.133")
-	    print "sample " sample ": " ts " " inBytes[hostIndex] " " outBytes[hostIndex] " " ts - lastTS
-	inTotal += inBytes[hostIndex]
-	outTotal += outBytes[hostIndex]
-	if(ts - lastTS >= s_intervals[intervalIndex+1]){
-	    compacted = 1
-	    hostNextIndex = hostNextPeriod","(++samples[hostNextPeriod])
-	    newEntry(hostNextIndex, lastTS=ts, inTotal, outTotal)
-	    inTotal = outTotal = 0
-	    for(dSample=lastIndex+1; dSample <= sample; dSample++){
-		hostIndex = hostPeriod","dSample
-		#!@todo this doesn't seem to free up any memory.
-		delete times[hostIndex]
-		delete inBytes[hostIndex]
-		delete outBytes[hostIndex]
-		minSample[hostPeriod]++
+    if(samples[hostPeriod]){
+	lastIndex = minSample[hostPeriod]-1
+	for(sample=minSample[hostPeriod]; sample <= samples[hostPeriod]; sample++){
+	    hostIndex = hostPeriod","sample
+	    ts = times[hostIndex]
+#	    if(host == "192.168.1.133")
+#		print "sample " sample " of " samples[hostPeriod] ": " ts " " inBytes[hostIndex] " " outBytes[hostIndex] " " ts - lastTS
+	    inTotal += inBytes[hostIndex]
+	    outTotal += outBytes[hostIndex]
+	    if(ts - lastTS >= s_intervals[intervalIndex+1]){
+		compacted = 1
+		hostNextIndex = hostNextPeriod","(++samples[hostNextPeriod])
+#		if(host == "192.168.1.133")
+#		    print "adding new entry to " nextPeriod ": " ts " " inTotal " " outTotal
+		newEntry(hostNextIndex, lastTS=ts, inTotal, outTotal)
+		inTotal = outTotal = 0
+		for(dSample=lastIndex+1; dSample <= sample; dSample++){
+		    hostIndex = hostPeriod","dSample
+		    #!@todo this doesn't seem to free up any memory.
+		    delete times[hostIndex]
+		    delete inBytes[hostIndex]
+		    delete outBytes[hostIndex]
+		    minSample[hostPeriod]++
+		}
+		lastIndex = sample
 	    }
-	    lastIndex = sample
 	}
     }
-    if(host == "192.168.1.133")
-	print compacted
+#    if(host == "192.168.1.133")
+#	print compacted
     return(!compacted)
 }
 
@@ -160,13 +165,14 @@ function dump(  f, host, i, period, hostPeriod, sample, hostIndex)
     print "dump"
     for(host in hosts){
 	for(i=numLabels; i >= 1; i--){
-	    period = s_labels[i]
-	    f = host "_" period ".tsdb"
-	    close(f)
-	    hostPeriod = host","period
-	    
+	    close(f = host "_" (period = s_labels[i]) ".tsdb")
+	    if(!samples[hostPeriod = host","period]){
+		continue
+	    }
 	    for(sample=minSample[hostPeriod]; sample <= samples[hostPeriod]; sample++){
 		hostIndex = hostPeriod","sample
+		if(!times[hostIndex])
+		    print "Warning: zero time: " hostIndex
 		print times[hostIndex], inBytes[hostIndex], outBytes[hostIndex] > f
 	    }
 	    close(f)
@@ -218,7 +224,7 @@ FNR==1{
 }
 
 NF == 3 && $1 > 0{
-    newEntry(hostIndex = hostPeriod "," (++samples[hostPeriod]),
+    newEntry(hostPeriod "," (++samples[hostPeriod]),
 	     $1, $2, $3)
     next
 }
