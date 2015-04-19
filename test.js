@@ -1,5 +1,8 @@
 var lastTime = new Date(0)
-var data=null
+var data = null
+var selectedHost = null
+var auto = false
+var interval = null
 
 function toBars(hostData){
     bars = []
@@ -90,9 +93,9 @@ function parseData(textData, data){
 }
 
 function drawChart(host){
+    selectedHost = host
     if(host in data && data[host].length > 1){
 	var chart = new google.visualization.AreaChart(document.getElementById('myChart'));
-	//!@todo format data into bytes/s instead of bytes, plot rectangles instead of trapezoids
 	bars = toBars(data[host])
 	dt = [["time","in","out"]].concat(bars)
 	dt = google.visualization.arrayToDataTable(dt)
@@ -102,7 +105,10 @@ function drawChart(host){
     } else {
 	document.getElementById('myChart').innerHTML="no data for " + host
     }
-
+    if(!auto){
+	interval = window.setInterval(getData, 2000)
+	auto=true
+    }
 }
 
 function getData(){
@@ -116,19 +122,30 @@ function getData(){
 		oldLastTime = Infinity
 		for(var host in data)
 		    if(data.hasOwnProperty(host))
-			oldLastTime = new Date(Math.min(data[host][0][0], oldLastTime))
+			oldLastTime = new Date(Math.min(data[host][0][0],
+							oldLastTime))
 	    }
+	    if(selectedHost != null)
+		drawChart(selectedHost)
 	    hosts=[]
 	    for(var host in data)
 		if(data.hasOwnProperty(host))
 		    hosts.push(host)
 	    hostsString = ""
-	    for(i = 0; i < hosts.length; i++)
-		hostsString = hostsString + "<option value=\"" + hosts[i] + "\">" + hosts[i] + "</option>"
+	    for(i = 0; i < hosts.length; i++){
+		hostsString += "<option value=\"" + hosts[i] + "\""
+		if(selectedHost == hosts[i])
+		    hostsString += " selected"
+		hostsString += ">" + hosts[i] + "</option>"
+	    }
 	    //!@todo avoid unselecting previous selection when new data is loaded
-	    //!@todo redraw chart for the selected host when loading new data
-	    document.getElementById("hosts").innerHTML="<select onchange=\"drawChart(this.value)\">"+hostsString+"</select>"
-	    document.getElementById("data").innerHTML="got " + (lastTime - oldLastTime)/1000 + " s of data"
+	    // redraw chart for the selected host when loading new data
+	    document.getElementById("hosts").innerHTML =
+		"<select onchange=\"drawChart(this.value)\" onclick=\"console.debug(0)\">"+
+		hostsString+
+		"</select>"
+	    document.getElementById("data").innerHTML=
+		"got " + (lastTime - oldLastTime)/1000 + " s of data"
     	}
     }
     xmlhttp.open("GET",

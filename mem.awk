@@ -17,7 +17,7 @@ function command(a, host, dir, f){
 		hostIndex = hostPeriod","samples[hostPeriod]
 		times[hostIndex] = lastReadTS[host] = t
 		inBytes[hostIndex] = outBytes[hostIndex] = 0
-		print minSample[hostPeriod],samples[hostPeriod], $0
+#		print minSample[hostPeriod],samples[hostPeriod], $0
 	    } else
 		hostIndex = hostPeriod","samples[hostPeriod]
 	    dir  = a[2]
