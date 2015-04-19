@@ -4,6 +4,28 @@ var selectedHost = null
 var auto = false
 var interval = null
 
+function pause(obj){
+    if(arguments.length > 0){
+	switch(obj.innerHTML){
+	    //!@todo fix
+	case "Pause":
+	    obj.innerHTML = "Resume"
+    	    window.clearInterval(interval)
+	    auto = false
+	    break;
+	case "Resume":
+	    obj.innerHTML = "Pause"
+	    window.setInterval(getData, 2000)
+	    auto = true
+	    break;
+	}
+    } else {
+	if(interval != null)
+    	    window.clearInterval(interval)
+	auto = false
+    }
+}
+
 function toBars(hostData){
     bars = []
     for(i = 1; i < hostData.length; i++){
@@ -141,7 +163,7 @@ function getData(){
 	    //!@todo avoid unselecting previous selection when new data is loaded
 	    // redraw chart for the selected host when loading new data
 	    document.getElementById("hosts").innerHTML =
-		"<select onchange=\"drawChart(this.value)\" onclick=\"console.debug(0)\">"+
+		"<select onchange=\"drawChart(this.value)\" onfocus=\"pause()\">"+
 		hostsString+
 		"</select>"
 	    document.getElementById("data").innerHTML=
