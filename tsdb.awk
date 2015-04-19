@@ -158,6 +158,7 @@ NF==1 && $1 ~ /[0-9]+[.][0-9]+/{
 }
 
 NF==1 && $1 == "collect"{
+    if(!noCollect) next
     # we really just need to pause here and provide a consistent copy
     # of the on-disk data. This would also be faster if we kept a copy
     # in awk.
@@ -189,6 +190,6 @@ NF==1 && $1 == "collect"{
 END{
     dump()
     # record timestamp of last realtime entry
-    print "tsdb ending"
+#    print "tsdb ending" > "/dev/stderr"
     if(t) print t > fLastUpdate
 }

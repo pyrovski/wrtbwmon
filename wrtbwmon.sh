@@ -28,7 +28,8 @@
 [ -p /tmp/wrtbwmon.pipe ] || mkfifo /tmp/wrtbwmon.pipe
 
 trap "rm -f /tmp/*$$.tmp; kill -SIGINT $$" SIGINT
-baseDir=/mnt/cifs2
+baseDir=/tmp
+dataDir=/mnt/cifs2
 
 chains='INPUT OUTPUT FORWARD'
 DEBUG=
@@ -84,7 +85,7 @@ case $1 in
 	
 	# first do some number crunching - rewrite the database so that it is sorted
 
-	# publishing doesn't need a lock, it needs a stable copy of
+	# publishing doesn't need a lock; it needs a stable copy of
 	# the db. If continuous is running, send a signal to make a
 	# copy.
 	read pid 2>/dev/null < /tmp/continuous.pid
@@ -108,16 +109,17 @@ case $1 in
 	fi
 
         # create HTML page
-	cp $baseDir/usage.htm1 $3
+	cp $dataDir/usage.htm1 $3.tmp
 	while IFS=, read PEAKUSAGE_IN MAC IP IFACE PEAKUSAGE_OUT OFFPEAKUSAGE_IN OFFPEAKUSAGE_OUT TOTAL FIRSTSEEN LASTSEEN
 	do
 	    echo "
 new Array(\"$(lookup $MAC $IP $4)\",
-$PEAKUSAGE_IN,$PEAKUSAGE_OUT,$OFFPEAKUSAGE_IN,$OFFPEAKUSAGE_OUT,$TOTAL,\"$FIRSTSEEN\",\"$LASTSEEN\")," >> ${3}
+$PEAKUSAGE_IN,$PEAKUSAGE_OUT,$OFFPEAKUSAGE_IN,$OFFPEAKUSAGE_OUT,$TOTAL,\"$FIRSTSEEN\",\"$LASTSEEN\")," >> $3.tmp
 	done < /tmp/sorted_$$.tmp
-	echo "0);" >> ${3}
+	echo "0);" >> $3.tmp
 	
-	sed "s/(date)/`date`/" < $baseDir/usage.htm2 >> $3
+	sed "s/(date)/`date`/" < $dataDir/usage.htm2 >> $3.tmp
+	mv $3.tmp $3
 	
 	#Free some memory
 	rm -f /tmp/*_$$.tmp

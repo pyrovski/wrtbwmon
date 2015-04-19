@@ -4,15 +4,20 @@ go=1
 trap "go=0; kill -SIGQUIT $pipesPID $timerPID; rm -f /tmp/$$.*; exit 1" SIGINT
 
 echo -en "Content-Type: text/plain\nContent-Encoding: gzip\n\n"
-mkfifo /tmp/$$.pipe
+cd /tmp || exit 1
 
 #!@todo start continuous if not running
 
+t=`echo "$QUERY_STRING" | sed -r 's/(^|.*,)t=([0-9]+([.][0-9]+)*).*/\2/'`
 continuousPID=`cat /tmp/continuous.pid`
-[ -n "$continuousPID" ] || exit 1
+if [ $? -ne 0 -o -z "$continuousPID" ]; then
+    mode=diff ./wrtbwmon update ./usage.db | awk -v noCollect=1 -f ./tsdb.awk
+    awk -v ts=$t -f ./dump.awk *.tsdb | gzip -c -
+    exit
+fi
+mkfifo /tmp/$$.pipe
 
 #!@todo this script should be modified to implement db backup functionality
-t=`echo "$QUERY_STRING" | sed -r 's/(^|.*,)t=([0-9]+([.][0-9]+)*).*/\2/'`
 
 [ -p /tmp/continuous.pipe ] || exit 1
 (echo "$$ $t"
