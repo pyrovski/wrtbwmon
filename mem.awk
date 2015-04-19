@@ -1,39 +1,67 @@
-function compact(host,
+function command(){
+    if(NF == 2){
+	print $0
+	dumpJSON($1, $2)
+	close($2)
+    } else if(NF == 1 && $1 == "dump") {
+	print "dump"
+	for(host in hosts)
+	    compact(host)
+	dump()
+    }
+}
+
+function _compact(host, intervalIndex,
 		 hostIndex, hostNextIndex, hostPeriod, hostNextPeriod, period,
 		 inTotal, outTotal, lastTS, ts, sample, dSample, nSamples,
-		 nextSamples)
+		  nextSamples, compacted)
 {
-    # start at the end of the realtime array, compact
-    period = s_labels[1]
-    nextPeriod = s_labels[2]
+    # start at the end of the realtime array, compact.
+
+    # This differs from the original file-based compact() in that it
+    # doesn't maintain an interval start entry at the head of each
+    # period. The only change that should be necessary is to make sure
+    # that new hosts get a zero entry before their first measurement.
+    period = s_labels[intervalIndex]
+    nextPeriod = s_labels[intervalIndex+1]
     hostPeriod = host","period
     hostNextPeriod = host","nextPeriod
     nSamples = samples[hostPeriod]
     nextSamples = samples[hostNextPeriod]
-    lastIndex = minSample[hostPeriod]
+    lastIndex = minSample[hostPeriod]-1
     lastTS = times[hostNextPeriod","nextSamples]
-    for(sample=lastIndex; sample <= nSamples; sample++){
+    compacted = 0
+    for(sample=lastIndex+1; sample <= nSamples; sample++){
 	hostIndex = hostPeriod","sample
 	ts = times[hostIndex]
 	inTotal += inBytes[hostIndex]
 	outTotal += outBytes[hostIndex]
-	if(ts - lastTS >= s_intervals[2]){
-	    lastTS = ts
+	if(ts - lastTS >= s_intervals[intervalIndex+1]){
+	    compacted = 1
 	    nextSamples = ++samples[hostNextPeriod]
 	    hostNextIndex = hostNextPeriod","nextSamples
-	    times[hostNextIndex] = ts
+	    times[hostNextIndex] = lastTS = ts
 	    inBytes[hostNextIndex] = inTotal
 	    outBytes[hostNextIndex] = outTotal
 	    inTotal = outTotal = 0
-	    for(dSample=lastIndex; dSample <= sample; dSample++){
+	    for(dSample=lastIndex+1; dSample <= sample; dSample++){
 		hostIndex = hostPeriod","dSample
 		delete times[hostIndex]
 		delete inBytes[hostIndex]
 		delete outBytes[hostIndex]
 		minSample[hostPeriod]++
 	    }
+	    lastIndex = sample
 	}
     }
+    return(!compacted)
+}
+
+function compact(host,
+		 i){
+    for(i=1; i < numLabels; i++)
+	if(_compact(host, i))
+	    break
 }
 
 function dumpJSON(ts, toPipe,
@@ -118,19 +146,13 @@ $1 > 0{
     times[hostIndex] = $1
     inBytes[hostIndex] = $2
     outBytes[hostIndex] = $3
+    next
 }
 
 END{
     while(1){
 	getline < "/tmp/pipe"
-	if(NF == 2){
-	    print $0
-	    dumpJSON($1, $2)
-	    close($2)
-	} else {
-	    for(host in hosts)
-		compact(host)
-	    dump()
-	}
+	close("/tmp/pipe")
+	command()
     }
 }
