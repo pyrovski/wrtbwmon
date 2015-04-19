@@ -39,19 +39,19 @@ function compact(host,
 function dump(ts, toPipe,
 	      host, printCount, i, period, hostPeriod, sample, hostIndex)
 {
+    print "{" > toPipe
     printCount = 0
     for(host in hosts){
 	for(i=numLabels; i >= 1; i--){
 	    period = s_labels[i]
-	    if(printCount)
+	    if(printCount++)
 		printf "," > toPipe
-	    print "\""host":"period"\":[" > toPipe
-	    printCount++
+	    print "\"" host ":" period "\":[" > toPipe
 	    hostPeriod = host","period
 	    if(times[hostPeriod","samples[hostPeriod]] <= ts){
 		continue
 	    }
-	    
+
 	    for(sample=minSample[hostPeriod]; sample <= samples[hostPeriod]; sample++){
 		hostIndex = hostPeriod","sample
 		if(times[hostIndex] <= ts){
@@ -63,6 +63,7 @@ function dump(ts, toPipe,
 	    print ",0]" > toPipe
 	}
     }
+    print "}" > toPipe
 }
 
 BEGIN{
@@ -92,8 +93,8 @@ FNR==1{
     }
 }
 
-{    
-    hostIndex = hostPeriod "," ++samples[hostPeriod]
+{
+    hostIndex = hostPeriod "," (++samples[hostPeriod])
     times[hostIndex] = $1
     inBytes[hostIndex] = $2
     outBytes[hostIndex] = $3
@@ -106,9 +107,8 @@ END{
 	print $0
 	dump($1, $2)
 	close($2)
-	for(host in hosts){
+	#for(host in hosts){
 	    #compact(host)
-	}
+	#}
     }
-#    dump(0, "/dev/stdout")
 }
