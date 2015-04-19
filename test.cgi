@@ -17,16 +17,12 @@ if [ $? -ne 0 -o -z "$continuousPID" ]; then
     awk -v ts=$t -f ./dump.awk *.tsdb | gzip -c -
     exit
 fi
-mkfifo /tmp/$$.pipe
 
 #!@todo this script should be modified to implement db backup functionality
 
 [ -p /tmp/continuous.pipe ] || exit 1
-(echo "$$ $t"
- while true; do
-     read < /tmp/$$.pipe && break
- done
-) > /tmp/continuous.pipe &
+mkfifo /tmp/$$.pipe || exit 1
+echo "$$ $t" > /tmp/continuous.pipe &
 pipesPID=$!
 
 #elapsed=0
@@ -42,11 +38,12 @@ pipesPID=$!
 #    kill $pipesPID) &
 #timerPID=$!
 wait $pipesPID
-if [ ! -f /tmp/$$.dump ]; then
-    >&2 echo "$$ no dump"
+#if [ ! -f /tmp/$$.dump ]; then
+#    >&2 echo "$$ no dump"
 #    kill $timerPID; wait
-    exit 1
-fi
-gzip -c /tmp/$$.dump
+#    exit 1
+#else
+    gzip -c /tmp/$$.pipe
+#fi
 #kill $timerPID; wait
-rm -f /tmp/$$.{pipe,dump}
+rm -f /tmp/$$.pipe

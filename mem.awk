@@ -1,13 +1,41 @@
-function command(){
+function command(a, host, dir, f){
     if(NF == 2){
-	print $0
-	dumpJSON($1, $2)
-	close($2)
-    } else if(NF == 1 && $1 == "dump") {
-	print "dump"
-	for(host in hosts)
-	    compact(host)
-	dump()
+	if($1 ~ /\//){
+	    split($1, a, "/")
+	    host = a[1]
+	    if(t != lastReadTS[host]){
+		++samples[host",r"]
+		lastReadTS[host] = t
+	    }
+	    hostIndex = host",r,"samples[host",r"]
+	    dir  = a[2]
+	    if(dir == "in")
+		inBytes[hostIndex] = $2
+	    else
+		outBytes[hostIndex] = $2
+	} else if($2 ~ /[0-9]+([.][0-9]+)?/){
+	    ## pid timestamp
+	    print $0
+	    f = "/tmp/"$1".pipe"
+	    dumpJSON($2, f)
+	    close(f)
+	}
+    } else if(NF == 1){
+	if($1 == "dump"){
+	    print $0
+	    if(t) print totalSamples/(t-firstTS) "/s"
+	    for(host in hosts)
+		compact(host)
+	    dump()
+	} else if($1 ~ /[0-9]+[.][0-9]+/){
+	    if(t==0)
+		firstTS=$1
+	    t=sprintf("%f", $1) + 0
+	    totalSamples++
+	} else if($1 == "exit"){
+	    dump()
+	    exit
+	}
     }
 }
 
@@ -112,15 +140,29 @@ function dump(  f, host, i, period, hostPeriod, sample, hostIndex)
 	    close(f)
 	}
     }
+    if(t) print t > fLastUpdate
 }
 
 BEGIN{
+    quiet=1
+    fLastUpdate = "/tmp/wrtbwmon.lastUpdate"
+#    r=getline t < fLastUpdate
+#    close(fLastUpdate)
+#    if(r != 1)
+	t=0
+#    else
+#	firstTS = t
+
     intervals="0 10  60 3600 86400 2628000 31536000"
     labels   ="r 10s m  h    d     M       y"
     split(intervals, s_intervals)
     numLabels=split(labels, s_labels)
     for(i=1; i <= numLabels; i++)
 	intervalMap[s_intervals[i]] = s_labels[i]
+    pipe="/tmp/continuous.pipe"
+    #!@todo support zeros as in tsdb.awk
+    #zeros=""
+    totalSamples = 0
 }
 
 FNR==1{
@@ -151,8 +193,9 @@ $1 > 0{
 
 END{
     while(1){
-	getline < "/tmp/pipe"
-	close("/tmp/pipe")
+	getline < pipe
+	close(pipe)
 	command()
     }
+    print "exit?"
 }
