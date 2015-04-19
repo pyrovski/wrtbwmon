@@ -158,7 +158,10 @@ NF==1 && $1 ~ /[0-9]+[.][0-9]+/{
 }
 
 NF==1 && $1 == "collect"{
-    if(!noCollect) next
+    if(noCollect){
+	print "no collect!" > "/dev/stderr"
+	next
+    }
     # we really just need to pause here and provide a consistent copy
     # of the on-disk data. This would also be faster if we kept a copy
     # in awk.

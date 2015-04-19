@@ -73,8 +73,6 @@ case $1 in
 
 	[ "$mode" != "noUpdate" ] && echo $curDate > /tmp/wrtbwmon.lastUpdate
 
-        #Free some memory
-	rm -f /tmp/*_$$.tmp
 	exit
 	;;
     
