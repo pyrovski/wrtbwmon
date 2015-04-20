@@ -122,7 +122,7 @@ function drawChart(host){
 	dt = [["time","in","out"]].concat(bars)
 	dt = google.visualization.arrayToDataTable(dt)
 
-	var options = {explorer:{}}
+	var options = {explorer:{}} // hAxis:{logScale:true}
 	chart.draw(dt, options)
     } else {
 	document.getElementById('myChart').innerHTML="no data for " + host
@@ -162,10 +162,15 @@ function getData(){
 	    }
 	    //!@todo avoid unselecting previous selection when new data is loaded
 	    // redraw chart for the selected host when loading new data
+	    activeElement = document.activeElement
+	    var selectActive = activeElement.id == "select"
 	    document.getElementById("hosts").innerHTML =
-		"<select onchange=\"drawChart(this.value)\" onfocus=\"pause()\">"+
+		"<select onchange=\"drawChart(this.value)\" " +
+		" id=\"select\">"+ 
 		hostsString+
 		"</select>"
+	    if(selectActive)
+		document.getElementById("select").focus()
 	    document.getElementById("data").innerHTML=
 		"got " + (lastTime - oldLastTime)/1000 + " s of data"
     	}
