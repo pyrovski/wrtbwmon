@@ -1,3 +1,5 @@
+//!@todo add option to display only last N minutes
+
 var lastTime = new Date(0)
 var data = null
 var selectedHost = null
@@ -139,6 +141,7 @@ function getData(){
     {
     	if (xmlhttp.readyState==4 && xmlhttp.status==200){
 	    oldLastTime = lastTime
+	    //!@todo add only new data to plot
 	    data = parseData(xmlhttp.responseText, data)
 	    if(oldLastTime.getTime() == 0){
 		oldLastTime = Infinity
@@ -153,6 +156,7 @@ function getData(){
 	    for(var host in data)
 		if(data.hasOwnProperty(host))
 		    hosts.push(host)
+	    //!@todo sort hosts by total size
 	    hostsString = ""
 	    for(i = 0; i < hosts.length; i++){
 		hostsString += "<option value=\"" + hosts[i] + "\""
