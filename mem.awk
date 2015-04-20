@@ -55,6 +55,10 @@ function command(a, host, dir, f){
 	} else if($1 ~ /[0-9]+[.][0-9]+/){
 	    t=$1
 	    totalSamples++
+	    if(firstTS && t && t - firstTS > 600){
+		dump()
+		exit
+	    }
 	} else if($1 == "exit"){
 	    dump()
 	    exit
@@ -68,19 +72,9 @@ function _compact(host, intervalIndex,
 		  compacted)
 {
     # start at the end of the realtime array, compact.
-
-    # This differs from the original file-based compact() in that it
-    # doesn't maintain an interval start entry at the head of each
-    # period. The only change that should be necessary is to make sure
-    # that new hosts get a zero entry before their first measurement.
-
-#    if(host == "192.168.1.133")
-#	print "compacting " host " " s_labels[intervalIndex] "(" s_intervals[intervalIndex] ") to " s_labels[intervalIndex+1] "(" s_intervals[intervalIndex+1] ")"
     hostPeriod = host","(period = s_labels[intervalIndex])
     hostNextPeriod = host","(nextPeriod = s_labels[intervalIndex+1])
     if(!samples[hostNextPeriod]){
-#	if(host == "192.168.1.133")
-#	    print "adding new entry to " nextPeriod ": " lastUpdate
 	newEntry(hostNextPeriod","(++samples[hostNextPeriod]),
 		 lastUpdate, 0, 0)
 	lastTS = lastUpdate
@@ -92,15 +86,11 @@ function _compact(host, intervalIndex,
 	for(sample=minSample[hostPeriod]; sample <= samples[hostPeriod]; sample++){
 	    hostIndex = hostPeriod","sample
 	    ts = times[hostIndex]
-#	    if(host == "192.168.1.133")
-#		print "sample " sample " of " samples[hostPeriod] ": " ts " " inBytes[hostIndex] " " outBytes[hostIndex] " " ts - lastTS
 	    inTotal += inBytes[hostIndex]
 	    outTotal += outBytes[hostIndex]
 	    if(ts - lastTS >= s_intervals[intervalIndex+1]){
 		compacted = 1
 		hostNextIndex = hostNextPeriod","(++samples[hostNextPeriod])
-#		if(host == "192.168.1.133")
-#		    print "adding new entry to " nextPeriod ": " ts " " inTotal " " outTotal
 		newEntry(hostNextIndex, lastTS=ts, inTotal, outTotal)
 		inTotal = outTotal = 0
 		for(dSample=lastIndex+1; dSample <= sample; dSample++){
@@ -115,8 +105,6 @@ function _compact(host, intervalIndex,
 	    }
 	}
     }
-#    if(host == "192.168.1.133")
-#	print compacted
     return(!compacted)
 }
 
@@ -175,7 +163,8 @@ function dump(  f, host, i, period, hostPeriod, sample, hostIndex)
 	    close(f)
 	}
     }
-    if(t) print t > fLastUpdate
+    if(t)
+	print lastDump = t > fLastUpdate
 }
 
 BEGIN{
@@ -207,9 +196,8 @@ FNR==1{
 	n = split(FILENAME, f, "/")
 	f = f[n]
 	split(f, f, "_")
-	if(!((host = f[1]) in hosts))
-	    newHost(host)
-
+	if(!((host = f[1]) in hosts)) newHost(host)
+	
 	split(f[2], period, ".")
 	period = period[1]
 	if(!((hostPeriod = host","period) in samples))
