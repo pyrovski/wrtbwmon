@@ -18,10 +18,8 @@ updatePID()
 
 mem(){
     read < /tmp/cl.pipe
-    files=$(ls *.tsdb)
-    echo "files: $files"
     while [ -f /tmp/continuous.pid ]; do
-	awk -f mem.awk $files
+	awk -f mem.awk $(ls *.tsdb)
     done
 }
 

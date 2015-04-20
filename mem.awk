@@ -76,10 +76,8 @@ function _compact(host, intervalIndex,
 
 #    if(host == "192.168.1.133")
 #	print "compacting " host " " s_labels[intervalIndex] "(" s_intervals[intervalIndex] ") to " s_labels[intervalIndex+1] "(" s_intervals[intervalIndex+1] ")"
-    period = s_labels[intervalIndex]
-    nextPeriod = s_labels[intervalIndex+1]
-    hostPeriod = host","period
-    hostNextPeriod = host","nextPeriod
+    hostPeriod = host","(period = s_labels[intervalIndex])
+    hostNextPeriod = host","(nextPeriod = s_labels[intervalIndex+1])
     if(!samples[hostNextPeriod]){
 #	if(host == "192.168.1.133")
 #	    print "adding new entry to " nextPeriod ": " lastUpdate
@@ -141,13 +139,13 @@ function dumpJSON(ts, toPipe,
 		printf "," > toPipe
 	    print "\"" host ":" period "\":[" > toPipe
 	    hostPeriod = host","period
-	    if(times[hostPeriod","samples[hostPeriod]] <= ts){
+	    if(!samples[hostPeriod] ||
+	       times[hostPeriod","samples[hostPeriod]] <= ts){
 		print "0]" > toPipe
 		continue
 	    }
 	    for(sample=minSample[hostPeriod]; sample <= samples[hostPeriod]; sample++){
-		hostIndex = hostPeriod","sample
-		if(times[hostIndex] <= ts){
+		if(times[hostIndex = hostPeriod","sample] <= ts){
 		    #!@todo could do a binary search for the start time
 		    continue
 		}
@@ -170,8 +168,7 @@ function dump(  f, host, i, period, hostPeriod, sample, hostIndex)
 		continue
 	    }
 	    for(sample=minSample[hostPeriod]; sample <= samples[hostPeriod]; sample++){
-		hostIndex = hostPeriod","sample
-		if(!times[hostIndex])
+		if(!times[hostIndex = hostPeriod","sample])
 		    print "Warning: zero time: " hostIndex
 		print times[hostIndex], inBytes[hostIndex], outBytes[hostIndex] > f
 	    }
@@ -210,23 +207,18 @@ FNR==1{
 	n = split(FILENAME, f, "/")
 	f = f[n]
 	split(f, f, "_")
-	host = f[1]
-	if(!(host in hosts))
+	if(!((host = f[1]) in hosts))
 	    newHost(host)
 
 	split(f[2], period, ".")
 	period = period[1]
-	hostPeriod = host","period
-	if(!(hostPeriod in samples)){
+	if(!((hostPeriod = host","period) in samples))
 	    samples[hostPeriod] = 0
-	}
     }
 }
 
 NF == 3 && $1 > 0{
-    newEntry(hostPeriod "," (++samples[hostPeriod]),
-	     $1, $2, $3)
-    next
+    newEntry(hostPeriod "," (++samples[hostPeriod]), $1, $2, $3)
 }
 
 END{
