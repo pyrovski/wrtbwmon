@@ -13,9 +13,9 @@ It accomplishes this with `iptables` rules, which means you don't need to run an
 so you can easily determine which user/device is the culprit.
 
 ### How do I use it?
-- Setup: `./wrtbwmon setup`
-- Update table: `./wrtbwmon update /tmp/usage.db` (you can place the data table anywhere)
-- Create html page: `./wrtbwmon publish /tmp/usage.db /tmp/usage.htm`
+- Setup: `./wrtbwmon.sh setup`
+- Update table: `./wrtbwmon.sh update /tmp/usage.db` (you can place the data table anywhere)
+- Create html page: `./wrtbwmon.sh publish /tmp/usage.db /tmp/usage.htm`
 
 ### Regular updates
  - Install script to /usr/sbin:
@@ -24,12 +24,12 @@ so you can easily determine which user/device is the culprit.
 
   or
   
-        wget -O /usr/sbin/wrtbwmon https://raw.githubusercontent.com/pyrovski/wrtbwmon/master/wrtbwmon.sh
+        wget -O /usr/sbin/wrtbwmon.sh https://raw.githubusercontent.com/pyrovski/wrtbwmon/master/wrtbwmon.sh
         
 - Add the following to root's crontab:
 
-        * * * * * /usr/sbin/wrtbwmon update /tmp/usage.db
-        0 * * * * /usr/sbin/wrtbwmon publish /tmp/usage.db /tmp/usage.htm
+        * * * * * /usr/sbin/wrtbwmon.sh update /tmp/usage.db
+        0 * * * * /usr/sbin/wrtbwmon.sh publish /tmp/usage.db /tmp/usage.htm
 
 ### Remove `iptables` rules
- - `./wrtbwmon remove`
+ - `./wrtbwmon.sh remove`
