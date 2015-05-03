@@ -19,7 +19,7 @@ so you can easily determine which user/device is the culprit.
 
 ### Regular updates
  - Install the wrtbwmon.sh script somewhere, making sure to update `baseDir` and `dataDir` to point to `readDB.awk` and `usage.htm*`, respectively.
- - Add the following to root's crontab, assuming <script location> is replaced with the actual location:
+ - Add the following to root's crontab, assuming `<script location>` is replaced with the actual location:
 
         * * * * * <script location> update /tmp/usage.db
         0 * * * * <script location> publish /tmp/usage.db /tmp/usage.htm
