@@ -35,7 +35,7 @@ chains='INPUT OUTPUT FORWARD'
 DEBUG=
 interfaces='eth0 tun0' # in addition to detected WAN
 DB=$2
-mode=diff
+mode=
 
 header="#mac,ip,iface,peak_in,peak_out,offpeak_in,offpeak_out,total,first_date,last_date"
 
@@ -231,7 +231,7 @@ $PEAKUSAGE_IN,$PEAKUSAGE_OUT,$OFFPEAKUSAGE_IN,$OFFPEAKUSAGE_OUT,$TOTAL,\"$FIRSTS
 	# track local data
 	for chain in INPUT OUTPUT; do
 	    for interface in $interfaces; do
-		[ -n "$interface" ] && newRuleIF $chain $interface
+		[ -n "$interface" ] && [ -e "/sys/class/net/$interface" ] && newRuleIF $chain $interface
 	    done
 	done
 
