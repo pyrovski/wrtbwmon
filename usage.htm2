@@ -1,0 +1,20 @@
+for (i=0; i < values.length-1; i++) {
+    document.write("<tr><td>");
+    document.write(values[i][0]);
+    document.write("</td>");
+    for (j=1; j < 6; j++) {
+        document.write("<td>");
+        document.write(getSize(values[i][j]));
+        document.write("</td>");
+    }
+    document.write("<td>");
+    document.write(values[i][6]);
+    document.write("</td>");
+    document.write("<td>");
+    document.write(values[i][7]);
+    document.write("</td>");
+    document.write("</tr>");
+}
+</script></table>
+<br /><small>This page was generated on (date)</small>
+</body></html>
