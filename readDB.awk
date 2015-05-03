@@ -1,7 +1,10 @@
+function inInterfaces(host){
+    return(interfaces ~ "(^| )"host"($| )")
+}
 
 function newRule(arp_ip){
-	system("iptables -t mangle -I RRDIPT_FORWARD -d " arp_ip " -j RETURN")
-	system("iptables -t mangle -I RRDIPT_FORWARD -s " arp_ip " -j RETURN")
+    system("iptables -t mangle -I RRDIPT_FORWARD -d " arp_ip " -j RETURN")
+    system("iptables -t mangle -I RRDIPT_FORWARD -s " arp_ip " -j RETURN")
 }
 
 function total(i){
@@ -33,8 +36,10 @@ BEGIN {
 FNR==NR {
     if($2 == "NA")
 	#!@todo could get interface IP here
-	$2=$1
-    n=$2
+	n=$1
+    else
+	n=$2
+
     hosts[n] = ""
     mac[n]        =  $1
     ip[n]         =  $2
@@ -108,7 +113,13 @@ fid==3 && rrd {
 	if(mode!="noUpdate"){
 	    bwp[n]+=$2
 	    # compare label to wan input variable
-	    if(m == wan) m = "(WAN)"
+	    if(inInterfaces(m)){
+		if(!(m in mac)){
+		    firstDate[m]=lastDate[m] = date()
+		    mac[m] = inter[m] = m
+		    ip[m] = "NA"
+		}
+	    }
 	    lastDate[m] = date()
 	}
     }
@@ -124,6 +135,8 @@ END {
 	print mac[i], ip[i], inter[i], bwp[i "/in"], bwp[i "/out"], bwo[i "/in"], bwo[i "/out"], total(i), firstDate[i], lastDate[i] > dbFile
 
     # for hosts without rules
-    for(host in hosts)
-	newRule(host)
+    for(host in hosts){
+	if(!inInterfaces(host))
+	    newRule(host)
+    }
 }

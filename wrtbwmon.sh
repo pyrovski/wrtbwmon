@@ -33,8 +33,9 @@ dataDir=.
 
 chains='INPUT OUTPUT FORWARD'
 DEBUG=
-tun=
+interfaces='eth0 tun0' # in addition to detected WAN
 DB=$2
+mode=diff
 
 header="#mac,ip,iface,peak_in,peak_out,offpeak_in,offpeak_out,total,first_date,last_date"
 
@@ -168,7 +169,7 @@ update()
 
     lock
 
-    iptables -nvxL -t mangle -Z | awk -v mode="$mode" -v wan="$wan" -f $baseDir/readDB.awk $DB /proc/net/arp -
+    iptables -nvxL -t mangle -Z | awk -v mode="$mode" -v interfaces="$interfaces" -f $baseDir/readDB.awk $DB /proc/net/arp -
     
     unlock
 }
@@ -178,6 +179,7 @@ update()
 case $1 in
     "update" )
 	wan=$(detectWAN)
+	interfaces="$interfaces $wan"
 	update
 	exit
 	;;
@@ -224,13 +226,13 @@ $PEAKUSAGE_IN,$PEAKUSAGE_OUT,$OFFPEAKUSAGE_IN,$OFFPEAKUSAGE_OUT,$TOTAL,\"$FIRSTS
 	    echo "Warning: failed to detect WAN interface."
 	    #else wanIP=`ifconfig $wan | grep -o 'inet addr:[0-9.]\+' | cut -d':' -f2`
 	fi
+	interfaces="$interfaces $wan"
 
 	# track local data
 	for chain in INPUT OUTPUT; do
-	    [ -n "$wan" ] && newRuleIF $chain $wan
-	    #!@todo automate this;
-	    # can detect gateway IPs: route -n | grep '^[0-9]' | awk '{print $2}' | sort | uniq | grep -v 0.0.0.0
-	    [ -n "$tun" ] && newRuleIF $chain $tun
+	    for interface in $interfaces; do
+		[ -n "$interface" ] && newRuleIF $chain $interface
+	    done
 	done
 
 	# this will add rules for hosts in arp table
