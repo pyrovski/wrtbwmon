@@ -25,8 +25,6 @@
 #!@todo add logger
 #!@todo reference awk scripts and html templates in predictable location
 
-set -x
-
 [ -p /tmp/wrtbwmon.pipe ] || mkfifo /tmp/wrtbwmon.pipe
 
 trap "rm -f /tmp/*$$.tmp; kill $$" INT
@@ -195,10 +193,9 @@ case $1 in
 	# busybox sort truncates numbers to 32 bits
 	grep -v '^#' $DB | awk -F, '{OFS=","; a=sprintf("%f",$4/1e6); $4=""; print a,$0}' | tr -s ',' | sort -rn | awk -F, '{OFS=",";$1=sprintf("%f",$1*1e6);print}' > /tmp/sorted_$$.tmp
 
-	unlock
-
         # create HTML page
 	cp $dataDir/usage.htm1 $3.tmp
+	
 	while IFS=, read PEAKUSAGE_IN MAC IP IFACE PEAKUSAGE_OUT OFFPEAKUSAGE_IN OFFPEAKUSAGE_OUT TOTAL FIRSTSEEN LASTSEEN
 	do
 	    echo "
@@ -209,6 +206,8 @@ $PEAKUSAGE_IN,$PEAKUSAGE_OUT,$OFFPEAKUSAGE_IN,$OFFPEAKUSAGE_OUT,$TOTAL,\"$FIRSTS
 	
 	sed "s/(date)/`date`/" < $dataDir/usage.htm2 >> $3.tmp
 	mv $3.tmp $3
+
+	unlock
 	
 	#Free some memory
 	rm -f /tmp/*_$$.tmp
@@ -226,9 +225,6 @@ $PEAKUSAGE_IN,$PEAKUSAGE_OUT,$OFFPEAKUSAGE_IN,$OFFPEAKUSAGE_OUT,$TOTAL,\"$FIRSTS
 	    #else wanIP=`ifconfig $wan | grep -o 'inet addr:[0-9.]\+' | cut -d':' -f2`
 	fi
 
-	# this will add rules for hosts in arp table
-	update
-	
 	# track local data
 	for chain in INPUT OUTPUT; do
 	    [ -n "$wan" ] && newRuleIF $chain $wan
@@ -236,7 +232,10 @@ $PEAKUSAGE_IN,$PEAKUSAGE_OUT,$OFFPEAKUSAGE_IN,$OFFPEAKUSAGE_OUT,$TOTAL,\"$FIRSTS
 	    # can detect gateway IPs: route -n | grep '^[0-9]' | awk '{print $2}' | sort | uniq | grep -v 0.0.0.0
 	    [ -n "$tun" ] && newRuleIF $chain $tun
 	done
-	
+
+	# this will add rules for hosts in arp table
+	update
+
 	;;
 
     "remove" )
