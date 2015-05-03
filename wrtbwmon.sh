@@ -245,11 +245,11 @@ $PEAKUSAGE_IN,$PEAKUSAGE_OUT,$OFFPEAKUSAGE_IN,$OFFPEAKUSAGE_OUT,$TOTAL,\"$FIRSTS
     *)
 	echo "Usage: $0 {setup|update|publish|remove} [options...]"
 	echo "Options: "
-	echo "   $0 setup"
+	echo "   $0 setup database_file"
 	echo "   $0 update database_file"
 	echo "   $0 publish database_file path_of_html_report [user_file]"
 	echo "Examples: "
-	echo "   $0 setup"
+	echo "   $0 setup /tmp/usage.db"
 	echo "   $0 update /tmp/usage.db"
 	echo "   $0 publish /tmp/usage.db /www/user/usage.htm /jffs/users.txt"
 	echo "   $0 remove"
