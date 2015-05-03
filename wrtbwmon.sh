@@ -27,7 +27,7 @@
 
 [ -p /tmp/wrtbwmon.pipe ] || mkfifo /tmp/wrtbwmon.pipe
 
-trap "rm -f /tmp/*$$.tmp; kill -SIGINT $$" SIGINT
+trap "rm -f /tmp/*$$.tmp; kill $$" INT
 baseDir=/tmp
 dataDir=/mnt/cifs2
 
