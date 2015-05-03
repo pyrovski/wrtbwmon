@@ -13,23 +13,16 @@ It accomplishes this with `iptables` rules, which means you don't need to run an
 so you can easily determine which user/device is the culprit.
 
 ### How do I use it?
-- Setup: `./wrtbwmon setup`
-- Update table: `./wrtbwmon update /tmp/usage.db` (you can place the data table anywhere)
+- Setup: `./wrtbwmon setup /tmp/usage/db` (you can place the data table anywhere)
+- Update table: `./wrtbwmon update /tmp/usage.db`
 - Create html page: `./wrtbwmon publish /tmp/usage.db /tmp/usage.htm`
 
 ### Regular updates
- - Install script to /usr/sbin:
- - 
-        ./install.sh
+ - Install the wrtbwmon.sh script somewhere, making sure to update `baseDir` and `dataDir` to point to `readDB.awk` and `usage.htm*`, respectively.
+ - Add the following to root's crontab, assuming <script location> is replaced with the actual location:
 
-  or
-  
-        wget -O /usr/sbin/wrtbwmon https://raw.githubusercontent.com/pyrovski/wrtbwmon/master/wrtbwmon.sh
-        
-- Add the following to root's crontab:
-
-        * * * * * /usr/sbin/wrtbwmon update /tmp/usage.db
-        0 * * * * /usr/sbin/wrtbwmon publish /tmp/usage.db /tmp/usage.htm
+        * * * * * <script location> update /tmp/usage.db
+        0 * * * * <script location> publish /tmp/usage.db /tmp/usage.htm
 
 ### Remove `iptables` rules
  - `./wrtbwmon remove`
