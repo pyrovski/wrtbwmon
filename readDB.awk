@@ -8,7 +8,7 @@ function newRule(arp_ip){
 }
 
 function total(i){
-    return(bwp[i "/in"] + bwp[i "/out"] + bwo[i "/in"] + bwo[i "/out"])
+    return(bw[i "/in"] + bw[i "/out"])
 }
 
 function date(){
@@ -44,12 +44,11 @@ FNR==NR {
     mac[n]        =  $1
     ip[n]         =  $2
     inter[n]      =  $3
-    bwp[n "/in"]  =  $4
-    bwp[n "/out"] =  $5
-    bwo[n "/in"]  =  $6
-    bwo[n "/out"] =  $7
-    firstDate[n]  =  $9
-    lastDate[n]   = $10
+    bw[n "/in"]   =  $4
+    bw[n "/out"]  =  $5
+    # total = $6
+    firstDate[n]  =  $7
+    lastDate[n]   =  $8
     next
 }
 
@@ -74,7 +73,7 @@ fid==2 {
 	mac[arp_ip]   = arp_mac
 	ip[arp_ip]    = arp_ip
 	inter[arp_ip] = arp_dev
-	bwp[arp_ip "/in"]=bwp[arp_ip "/out"]=bwo[arp_ip "/in"]=bwo[arp_ip "/out"] = 0
+	bw[arp_ip "/in"]=bw[arp_ip "/out"] = 0
 	firstDate[arp_ip]=lastDate[arp_ip] = date()
     }
     next
@@ -107,17 +106,17 @@ fid==3 && rrd {
     }
     delete hosts[m]
     if($2 > 0){
-	#!@todo offpeak
 	if(mode == "diff" || mode == "noUpdate")
 	    print n, $2
 	if(mode!="noUpdate"){
-	    bwp[n]+=$2
+	    bw[n]+=$2
 	    # compare label to wan input variable
 	    if(inInterfaces(m)){
 		if(!(m in mac)){
 		    firstDate[m]=lastDate[m] = date()
 		    mac[m] = inter[m] = m
 		    ip[m] = "NA"
+		    bw[mac "/in"]=bw[mac "/out"]= 0
 		}
 	    }
 	    lastDate[m] = date()
@@ -129,10 +128,10 @@ END {
     if(mode=="noUpdate")
 	exit
     close(dbFile)
-    print "#mac,ip,iface,peak_in,peak_out,offpeak_in,offpeak_out,total,first_date,last_date" > dbFile
+    print "#mac,ip,iface,peak_in,peak_out,total,first_date,last_date" > dbFile
     OFS=","
     for(i in mac)
-	print mac[i], ip[i], inter[i], bwp[i "/in"], bwp[i "/out"], bwo[i "/in"], bwo[i "/out"], total(i), firstDate[i], lastDate[i] > dbFile
+	print mac[i], ip[i], inter[i], bw[i "/in"], bw[i "/out"], total(i), firstDate[i], lastDate[i] > dbFile
 
     # for hosts without rules
     for(host in hosts){

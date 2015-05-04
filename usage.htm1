@@ -15,8 +15,6 @@ function getSize(size) {
 <th>User</th>
 <th>Peak download</th>
 <th>Peak upload</th>
-<th>Offpeak download</th>
-<th>Offpeak upload</th>
 <th>Total</th>
 <th>First seen</th>
 <th>Last seen</th>

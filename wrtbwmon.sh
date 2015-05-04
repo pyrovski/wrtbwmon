@@ -169,7 +169,11 @@ update()
 
     lock
 
-    iptables -nvxL -t mangle -Z | awk -v mode="$mode" -v interfaces="$interfaces" -f $baseDir/readDB.awk $DB /proc/net/arp -
+    iptables -nvxL -t mangle -Z > /tmp/iptables_$$.tmp
+    awk -v mode="$mode" -v interfaces="$interfaces" -f $baseDir/readDB.awk \
+	$DB \
+	/proc/net/arp \
+	/tmp/iptables_$$.tmp
     
     unlock
 }
@@ -181,11 +185,12 @@ case $1 in
 	wan=$(detectWAN)
 	interfaces="$interfaces $wan"
 	update
+	rm -f /tmp/*$$.tmp
 	exit
 	;;
     
     "publish" )
-
+	#!@todo fix
 	[ -z "$DB" ] && echo "ERROR: Missing database argument" && exit 1
 	[ -z "$3" ] && echo "ERROR: Missing argument 3" && exit 1
 	
@@ -198,11 +203,11 @@ case $1 in
         # create HTML page
 	cp $dataDir/usage.htm1 $3.tmp
 	
-	while IFS=, read PEAKUSAGE_IN MAC IP IFACE PEAKUSAGE_OUT OFFPEAKUSAGE_IN OFFPEAKUSAGE_OUT TOTAL FIRSTSEEN LASTSEEN
+	while IFS=, read PEAKUSAGE_IN MAC IP IFACE PEAKUSAGE_OUT TOTAL FIRSTSEEN LASTSEEN
 	do
 	    echo "
 new Array(\"$(lookup $MAC $IP $4)\",
-$PEAKUSAGE_IN,$PEAKUSAGE_OUT,$OFFPEAKUSAGE_IN,$OFFPEAKUSAGE_OUT,$TOTAL,\"$FIRSTSEEN\",\"$LASTSEEN\")," >> $3.tmp
+$PEAKUSAGE_IN,$PEAKUSAGE_OUT,$TOTAL,\"$FIRSTSEEN\",\"$LASTSEEN\")," >> $3.tmp
 	done < /tmp/sorted_$$.tmp
 	echo "0);" >> $3.tmp
 	

@@ -1,17 +1,13 @@
 for (i=0; i < values.length-1; i++) {
-    document.write("<tr><td>");
-    document.write(values[i][0]);
-    document.write("</td>");
-    for (j=1; j < 6; j++) {
-        document.write("<td>");
-        document.write(getSize(values[i][j]));
-        document.write("</td>");
-    }
+    document.write("<tr><td>" + values[i][0] + "</td>");
+    for (j=1; j < 4; j++)
+        document.write("<td>" + getSize(values[i][j]) + "</td>");
+
     document.write("<td>");
-    document.write(values[i][6]);
+    document.write(values[i][4]);
     document.write("</td>");
     document.write("<td>");
-    document.write(values[i][7]);
+    document.write(values[i][5]);
     document.write("</td>");
     document.write("</tr>");
 }
