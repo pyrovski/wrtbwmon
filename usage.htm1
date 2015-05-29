@@ -13,8 +13,8 @@ function getSize(size) {
 <table border="1">
 <tr bgcolor=silver>
 <th>User</th>
-<th>Peak download</th>
-<th>Peak upload</th>
+<th>Download</th>
+<th>Upload</th>
 <th>Total</th>
 <th>First seen</th>
 <th>Last seen</th>
