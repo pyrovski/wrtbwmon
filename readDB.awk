@@ -128,7 +128,8 @@ END {
     if(mode=="noUpdate")
 	exit
     close(dbFile)
-    print "#mac,ip,iface,peak_in,peak_out,total,first_date,last_date" > dbFile
+    system("rm -f " dbFile)
+    print "#mac,ip,iface,in,out,total,first_date,last_date" > dbFile
     OFS=","
     for(i in mac)
 	print mac[i], ip[i], inter[i], bw[i "/in"], bw[i "/out"], total(i), firstDate[i], lastDate[i] > dbFile

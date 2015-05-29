@@ -37,7 +37,7 @@ interfaces='eth0 tun0' # in addition to detected WAN
 DB=$2
 mode=
 
-header="#mac,ip,iface,peak_in,peak_out,offpeak_in,offpeak_out,total,first_date,last_date"
+header="#mac,ip,iface,in,out,total,first_date,last_date"
 
 lookup()
 {
@@ -201,6 +201,7 @@ case $1 in
 	grep -v '^#' $DB | awk -F, '{OFS=","; a=sprintf("%f",$4/1e6); $4=""; print a,$0}' | tr -s ',' | sort -rn | awk -F, '{OFS=",";$1=sprintf("%f",$1*1e6);print}' > /tmp/sorted_$$.tmp
 
         # create HTML page
+	rm -f $3.tmp
 	cp $dataDir/usage.htm1 $3.tmp
 	
 	while IFS=, read PEAKUSAGE_IN MAC IP IFACE PEAKUSAGE_OUT TOTAL FIRSTSEEN LASTSEEN
