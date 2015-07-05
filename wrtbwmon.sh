@@ -244,6 +244,7 @@ $PEAKUSAGE_IN,$PEAKUSAGE_OUT,$TOTAL,\"$FIRSTSEEN\",\"$LASTSEEN\")," >> $3.tmp
 	# this will add rules for hosts in arp table
 	update
 
+	rm -f /tmp/*$$.tmp
 	;;
 
     "remove" )
