@@ -24,6 +24,7 @@ BEGIN {
     fid=1
     debug=0
     rrd=0
+    split("", mac)
 }
 
 /^#/ {
@@ -116,7 +117,7 @@ fid==3 && rrd {
 		    firstDate[m]=lastDate[m] = date()
 		    mac[m] = inter[m] = m
 		    ip[m] = "NA"
-		    bw[mac "/in"]=bw[mac "/out"]= 0
+		    bw[n]=bw[n]= 0
 		}
 	    }
 	    lastDate[m] = date()
