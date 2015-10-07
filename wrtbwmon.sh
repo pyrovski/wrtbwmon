@@ -91,6 +91,8 @@ detectWAN()
     [ -n "$WAN_IF" ] && echo $WAN_IF && return
     wan=$(detectIF wan)
     [ -n "$wan" ] && echo $wan && return
+    wan=$(ip route show 2>/dev/null | grep default | sed -re '/^default/ s/default.*dev +([^ ]+).*/\1/')
+    [ -n "$wan" ] && echo $wan && return
 }
 
 lock()
