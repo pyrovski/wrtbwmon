@@ -25,8 +25,6 @@
 #!@todo add logger
 #!@todo reference awk scripts and html templates in predictable location
 
-[ -p /tmp/wrtbwmon.pipe ] || (rm -f /tmp/wrtbwmon.pipe; mknod /tmp/wrtbwmon.pipe p)
-
 trap "rm -f /tmp/*$$.tmp; kill $$" INT
 baseDir=.
 dataDir=.
