@@ -13,7 +13,7 @@ It accomplishes this with `iptables` rules, which means you don't need to run an
 so you can easily determine which user/device is the culprit.
 
 ### How do I use it?
-- Setup: `./wrtbwmon setup /tmp/usage/db` (you can place the data table anywhere)
+- Setup: `./wrtbwmon setup /tmp/usage.db` (you can place the data table anywhere)
 - Update table: `./wrtbwmon update /tmp/usage.db`
 - Create html page: `./wrtbwmon publish /tmp/usage.db /tmp/usage.htm`
 
