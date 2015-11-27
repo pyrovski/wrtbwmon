@@ -16,6 +16,10 @@ so you can easily determine which user/device is the culprit.
 - Setup: `./wrtbwmon setup /tmp/usage.db` (you can place the data table anywhere)
 - Update table: `./wrtbwmon update /tmp/usage.db`
 - Create html page: `./wrtbwmon publish /tmp/usage.db /tmp/usage.htm`
+- Create html page with MAC to Name substutition: `./wrtbwmon publish /tmp/usage.db /tmp/usage.htm /opt/data/users.txt`
+
+   Note: [user_file] is an optional file to match machines with their MAC address (multiple users on one device are rolled up into one).
+   Its format is: `00:ma:ca:dd:re:ss,Username` with one entry per line, lower case MAC.
 
 ### Regular updates
  - Install the wrtbwmon.sh script somewhere, making sure to update `baseDir` and `dataDir` to point to `readDB.awk` and `usage.htm*`, respectively.
