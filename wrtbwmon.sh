@@ -46,13 +46,13 @@ lookup()
 	[ ! -e "$USERSFILE" ] && continue
 	case $USERSFILE in
 	    /tmp/dhcp.leases )
-		USER=$(grep "$MAC" $USERSFILE | cut -f4 -s -d' ')
+		USER=$(grep -i "$MAC" $USERSFILE | cut -f4 -s -d' ')
 		;;
 	    /etc/hosts )
 		USER=$(grep "^$IP " $USERSFILE | cut -f2 -s -d' ')
 		;;
 	    * )
-		USER=$(grep "$MAC" "$USERSFILE" | cut -f2 -s -d,)
+		USER=$(grep -i "$MAC" "$USERSFILE" | cut -f2 -s -d,)
 		;;
 	esac
 	[ -n "$USER" ] && break
