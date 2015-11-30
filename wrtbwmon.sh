@@ -263,6 +263,6 @@ $PEAKUSAGE_IN,$PEAKUSAGE_OUT,$TOTAL,\"$FIRSTSEEN\",\"$LASTSEEN\")," >> $3.tmp
 	echo "   $0 publish /tmp/usage.db /www/user/usage.htm /jffs/users.txt"
 	echo "   $0 remove"
 	echo "Note: [user_file] is an optional file to match users with their MAC address"
-	echo "       Its format is: 00:MA:CA:DD:RE:SS,username , with one entry per line"
+	echo "       Its format is: 00:ma:ca:dd:re:ss,Username , with one entry per line and lower case MAC"
 	;;
 esac
