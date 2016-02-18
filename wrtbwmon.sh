@@ -27,7 +27,9 @@
 
 trap "rm -f /tmp/*$$.tmp; kill $$" INT
 baseDir=.
-dataDir=.
+dataDir=$baseDir
+lockDir=/tmp/wrtbwmon.lock
+pidFile=$lockDir/pid
 
 chains='INPUT OUTPUT FORWARD'
 DEBUG=
@@ -97,25 +99,28 @@ lock()
 {
     attempts=0
     while [ $attempts -lt 10 ]; do
-	mkdir /tmp/wrtbwmon.lock && break
+	mkdir $lockDir 2>/dev/null && break
 	attempts=$((attempts+1))
-	if [ -d /tmp/wrtbwmon.lock ]; then
-	    if [ ! -d /proc/$(cat /tmp/wrtbwmon.lock/pid) ]; then
-		echo "WARNING: Lockfile detected but process $(cat /tmp/wrtbwmon.lock/pid) does not exist !"
-		rm -rf /tmp/wrtbwmon.lock
+	pid=`cat $pidFile 2>/dev/null`
+	if [ -n "$pid" ]; then
+	    if [ -d "/proc/$pid" ]; then
+		[ -n "$DEBUG" ] && echo "WARNING: Lockfile detected but process $(cat $pidFile) does not exist !"
+		rm -rf $lockDir
 	    else
 		sleep 1
 	    fi
 	fi
     done
-    #[[ -n "$DEBUG" ]] && echo $$ "got lock after $attempts attempts"
+    mkdir $lockDir 2>/dev/null
+    echo $$ > $pidFile
+    [ -n "$DEBUG" ] && echo $$ "got lock after $attempts attempts"
     trap '' INT
 }
 
 unlock()
 {
-    rm -rf /tmp/wrtbwmon.lock
-    #[[ -n "$DEBUG" ]] && echo $$ "released lock"
+    rm -rf $lockDir
+    [ -n "$DEBUG" ] && echo $$ "released lock"
     trap "rm -f /tmp/*$$.tmp; kill $$" INT
 }
 
