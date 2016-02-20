@@ -6,3 +6,4 @@ Section: net
 Priority: optional
 Description: wrtbwmon was designed to track bandwidth consumption on home routers. It accomplishes this with iptables rules, which means you don't need to run an extra process just to track bandwidth. wrtbwmon conveniently tracks bandwidth consumption on a per-IP address basis, so you can easily determine which user/device is the culprit.
 Source: https://github.com/pyrovski/wrtbwmon
+Depends: gawk | mawk | busybox, iptables, sed | busybox, iproute2

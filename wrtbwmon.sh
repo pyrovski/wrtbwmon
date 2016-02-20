@@ -1,33 +1,20 @@
 #!/bin/sh
 #
-# Traffic logging tool for OpenWRT-based routers
+# wrtbwmon: traffic logging tool for OpenWRT-based routers
 #
-# Created by Emmanuel Brucy (e.brucy AT qut.edu.au)
-# Updated by Peter Bailey (peter.eldridge.bailey@gmail.com)
+# Peter Bailey (peter.eldridge.bailey+wrtbwmon AT gmail.com)
 #
-# Based on work from Fredrik Erlandsson (erlis AT linux.nu)
-# Based on traff_graph script by twist - http://wiki.openwrt.org/RrdTrafficWatch
-# 
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-# 
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-# 
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+# Based on work by:
+# Emmanuel Brucy (e.brucy AT qut.edu.au)
+# Fredrik Erlandsson (erlis AT linux.nu)
+# twist - http://wiki.openwrt.org/RrdTrafficWatch
 
 #!@todo add logger
 #!@todo reference awk scripts and html templates in predictable location
 
 trap "rm -f /tmp/*$$.tmp; kill $$" INT
-baseDir=.
-dataDir=$baseDir
+binDir=/usr/sbin
+dataDir=/usr/share/wrtbwmon
 lockDir=/tmp/wrtbwmon.lock
 pidFile=$lockDir/pid
 
@@ -175,7 +162,7 @@ update()
     lock
 
     iptables -nvxL -t mangle -Z > /tmp/iptables_$$.tmp
-    awk -v mode="$mode" -v interfaces="$interfaces" -f $baseDir/readDB.awk \
+    awk -v mode="$mode" -v interfaces="$interfaces" -f $binDir/readDB.awk \
 	$DB \
 	/proc/net/arp \
 	/tmp/iptables_$$.tmp
