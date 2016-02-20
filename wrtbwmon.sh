@@ -10,7 +10,6 @@
 # twist - http://wiki.openwrt.org/RrdTrafficWatch
 
 #!@todo add logger
-#!@todo reference awk scripts and html templates in predictable location
 
 trap "rm -f /tmp/*$$.tmp; kill $$" INT
 binDir=/usr/sbin
@@ -46,7 +45,6 @@ lookup()
 	esac
 	[ -n "$USER" ] && break
     done
-    #!@todo get hostname with: nslookup $IP | grep "$IP " | cut -d' ' -f4
     nslookup=`which nslookup`
     if [ -z "$USER" -a "$IP" != "NA" -a -n "$nslookup" ]; then
 	USER=`$nslookup $IP $DNS | awk '!/server can/{if($4){print $4; exit}}' | sed -re 's/[.]$//'`
@@ -186,7 +184,6 @@ case $1 in
 	;;
     
     "publish" )
-	#!@todo fix
 	[ -z "$DB" ] && echo "ERROR: Missing database argument" && exit 1
 	[ -z "$3" ] && echo "ERROR: Missing argument 3" && exit 1
 	
