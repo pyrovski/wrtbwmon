@@ -1,1 +1,11 @@
-wrtbwmon.sh
+#!/bin/sh /etc/rc.common
+
+START=91
+
+start(){
+	wrtbwmon setup /tmp/usage.db
+}
+
+stop(){
+	wrtbwmon remove
+}

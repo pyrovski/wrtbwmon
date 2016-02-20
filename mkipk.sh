@@ -1,9 +1,4 @@
-if [ -n "$DESTDIR" ]; then
-    mkdir -p $DESTDIR
-else
-    DESTDIR="/"
-fi
-
+tmpdir=$(mktemp -d)
 for file in $*; do
     dest=`grep $file ./fileMap | cut -d':' -f1`
     mkdir -p $tmpdir/$dest
@@ -13,8 +8,10 @@ for file in $*; do
     	perm=0644
     fi
     if [ -d "$file" ]; then
-    	install -d -m $perm $file $DESTDIR/$dest
+    	install -d -m $perm $file $tmpdir/$dest
     else
-    	install -m $perm $file $DESTDIR/$dest/
+    	install -m $perm $file $tmpdir/$dest/
     fi
 done
+fakeroot -- ipkg-build $tmpdir
+rm -rf $tmpdir

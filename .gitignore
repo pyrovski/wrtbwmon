@@ -6,3 +6,6 @@
 .RData
 \#*
 old
+TAGS
+*.tgz
+*.ipk
