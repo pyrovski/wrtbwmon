@@ -32,7 +32,7 @@ lookup()
     IP=$2
     userDB=$3
     for USERSFILE in $userDB /tmp/dhcp.leases /tmp/dnsmasq.conf /etc/dnsmasq.conf /etc/hosts; do
-	[ ! -e "$USERSFILE" ] && continue
+	[ -e "$USERSFILE" ] || continue
 	case $USERSFILE in
 	    /tmp/dhcp.leases )
 		USER=$(grep -i "$MAC" $USERSFILE | cut -f4 -s -d' ')
@@ -47,6 +47,10 @@ lookup()
 	[ -n "$USER" ] && break
     done
     #!@todo get hostname with: nslookup $IP | grep "$IP " | cut -d' ' -f4
+    nslookup=`which nslookup`
+    if [ -z "$USER" -a "$IP" != "NA" -a -n "$nslookup" ]; then
+	USER=`$nslookup $IP $DNS | awk '!/server can/{if($4){print $4; exit}}' | sed -re 's/[.]$//'`
+    fi
     [ -z "$USER" ] && USER=${MAC}
     echo $USER
 }

@@ -1,5 +1,5 @@
 DESTDIR?=/
-install-files=wrtbwmon.sh readDB.awk usage.htm*
+install-files=wrtbwmon.sh readDB.awk usage.htm* wrtbwmon
 ipk-files=control
 
 all: wrtbwmon.ipk
