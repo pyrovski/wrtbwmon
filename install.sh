@@ -5,8 +5,8 @@ else
 fi
 
 for file in $*; do
-    dest=`grep $file ./fileMap | cut -d':' -f1`
-    mkdir -p $tmpdir/$dest
+    dest=`egrep " $file( |$)" ./fileMap | cut -d':' -f1`
+    mkdir -p $DESTDIR/$dest
     if [ -n `echo $dest | egrep '/bin$'` ]; then
     	perm=0744
     else
