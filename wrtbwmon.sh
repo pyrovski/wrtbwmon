@@ -23,11 +23,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 #!@todo add logger
-
-#!@todo reference awk scripts and html templates in predictable
-# location; this could be done with a config file in /etc
-
-#!@todo add some tests
+#!@todo reference awk scripts and html templates in predictable location
 
 trap "rm -f /tmp/*$$.tmp; kill $$" INT
 baseDir=.

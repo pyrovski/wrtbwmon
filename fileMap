@@ -1,0 +1,3 @@
+/usr/bin: wrtbwmon wrtbwmon.sh readDB.awk
+/usr/share/wrtbwmon: usage.htm1 usage.htm2
+/CONTROL: control
