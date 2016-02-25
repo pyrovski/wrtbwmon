@@ -10,6 +10,7 @@
 # twist - http://wiki.openwrt.org/RrdTrafficWatch
 
 #!@todo add logger
+#!@todo cache DNS results
 
 trap "rm -f /tmp/*$$.tmp; kill $$" INT
 binDir=/usr/sbin
