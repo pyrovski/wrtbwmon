@@ -1,0 +1,9 @@
+- transition from invocation as "wrtbwmon" to "wrtbwmon.sh"
+- update readme
+- add ipk
+- install files according a standard filesystem layout
+- remove peak/offpeak distinction
+- add init script
+- perform reverse DNS lookups to find hostnames
+- fix locking issues
+- add "dump" option
