@@ -44,6 +44,7 @@ lookup()
 		USER=$(grep -i "$MAC" "$USERSFILE" | cut -f2 -s -d,)
 		;;
 	esac
+	[ "$USER" = "*" ] && USER=
 	[ -n "$USER" ] && break
     done
     nslookup=`which nslookup`
