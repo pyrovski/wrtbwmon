@@ -59,13 +59,13 @@ detectIF()
 {
     uci=`which uci 2>/dev/null`
     if [ -n "$uci" -a -x "$uci" ]; then
-	IF=`$uci get network.${1}.ifname`
+	IF=`$uci get network.${1}.ifname 2>/dev/null`
 	[ $? -eq 0 ] && echo $IF && return
     fi
 
     nvram=`which nvram 2>/dev/null`
     if [ -n "$nvram" -a -x "$nvram" ]; then
-	IF=`$nvram get ${1}_ifname`
+	IF=`$nvram get ${1}_ifname 2>/dev/null`
 	[ $? -eq 0 ] && echo $IF && return
     fi
 }
@@ -156,27 +156,29 @@ newRuleIF()
 update()
 {
     [ -z "$DB" ] && echo "ERROR: Missing argument 2 (database file)" && exit 1	
-    [ ! -f "$DB" ] && echo $header > "$DB"
     [ ! -w "$DB" ] && echo "ERROR: $DB not writable" && exit 1
-
-    if [ -z "$wan" ]; then
-	echo "Warning: failed to detect WAN interface."
-    fi
+    [ -z "$wan" ] && echo "Warning: failed to detect WAN interface."
 
     lock
-
+    [ ! -f "$DB" ] && echo $header > "$DB"
     iptables -nvxL -t mangle -Z > /tmp/iptables_$$.tmp
     awk -v mode="$mode" -v interfaces="$interfaces" -f $binDir/readDB.awk \
 	$DB \
 	/proc/net/arp \
 	/tmp/iptables_$$.tmp
-    
     unlock
 }
 
 ############################################################
 
 case $1 in
+    "dump" )
+	[ -z "$DB" ] && echo "ERROR: Missing database argument" && exit 1
+	lock
+	tr ',' '\t' < "$DB"
+	unlock
+    ;;
+
     "update" )
 	wan=$(detectWAN)
 	interfaces="$interfaces $wan"
@@ -184,7 +186,7 @@ case $1 in
 	rm -f /tmp/*_$$.tmp
 	exit
 	;;
-    
+
     "publish" )
 	[ -z "$DB" ] && echo "ERROR: Missing database argument" && exit 1
 	[ -z "$3" ] && echo "ERROR: Missing argument 3" && exit 1
@@ -245,7 +247,7 @@ $PEAKUSAGE_IN,$PEAKUSAGE_OUT,$TOTAL,\"$FIRSTSEEN\",\"$LASTSEEN\")," >> $3.tmp
     "remove" )
 	iptables-save | grep -v RRDIPT | iptables-restore
 	;;
-    
+
     *)
 	echo "Usage: $0 {setup|update|publish|remove} [options...]"
 	echo "Options: "
