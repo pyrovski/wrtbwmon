@@ -19,11 +19,21 @@ so you can easily determine which user/device is the culprit.
 - Create html page: `wrtbwmon.sh publish /tmp/usage.db /tmp/usage.htm`
 
 ### Regular updates
- - Install the wrtbwmon.sh script somewhere, making sure to update `baseDir` and `dataDir` to point to `readDB.awk` and `usage.htm*`, respectively.
- - Add the following to root's crontab, assuming `<script location>` is replaced with the actual location:
+- Install the necessary files:
+  - `./install.sh wrtbwmon.sh readDB.awk usage.htm1 usage.htm2 wrtbwmon`
+  - Or, if you have `make`, just `make install`
+  - In the future, there may be an IPK.
+- Add the following to root's crontab:
 
+        # adapt to your needs
+        PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+	
         * * * * * <script location> update /tmp/usage.db
         0 * * * * <script location> publish /tmp/usage.db /tmp/usage.htm
+
+- Enable web serving of the generated page (optional)
+  - This varies by environment, but for lighttpd:
+    - ln -s /tmp/usage.htm /var/www/html/
 
 ### Remove `iptables` rules
  - `wrtbwmon.sh remove`
