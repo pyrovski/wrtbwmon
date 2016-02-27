@@ -12,7 +12,7 @@
 #!@todo add logger
 #!@todo cache DNS results
 
-trap "rm -f /tmp/*$$.tmp; kill $$" INT
+trap "rm -f /tmp/*_$$.tmp; kill $$" INT
 binDir=/usr/sbin
 dataDir=/usr/share/wrtbwmon
 lockDir=/tmp/wrtbwmon.lock
@@ -112,7 +112,7 @@ unlock()
 {
     rm -rf $lockDir
     [ -n "$DEBUG" ] && echo $$ "released lock"
-    trap "rm -f /tmp/*$$.tmp; kill $$" INT
+    trap "rm -f /tmp/*_$$.tmp; kill $$" INT
 }
 
 # chain
@@ -181,7 +181,7 @@ case $1 in
 	wan=$(detectWAN)
 	interfaces="$interfaces $wan"
 	update
-	rm -f /tmp/*$$.tmp
+	rm -f /tmp/*_$$.tmp
 	exit
 	;;
     
@@ -239,7 +239,7 @@ $PEAKUSAGE_IN,$PEAKUSAGE_OUT,$TOTAL,\"$FIRSTSEEN\",\"$LASTSEEN\")," >> $3.tmp
 	# this will add rules for hosts in arp table
 	update
 
-	rm -f /tmp/*$$.tmp
+	rm -f /tmp/*_$$.tmp
 	;;
 
     "remove" )
