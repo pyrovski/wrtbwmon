@@ -13,19 +13,31 @@ It accomplishes this with `iptables` rules, which means you don't need to run an
 so you can easily determine which user/device is the culprit.
 
 ### How do I use it?
-- Install: `make install`
+- Install: Download and install ipk from the [releases page](https://github.com/pyrovski/wrtbwmon/releases/)
 - Setup: `wrtbwmon.sh setup`
 - Update table: `wrtbwmon.sh update /tmp/usage.db` (you can place the data table anywhere)
 - Create html page: `wrtbwmon.sh publish /tmp/usage.db /tmp/usage.htm`
 
-### Regular updates
-- Install the necessary files:
+### Installation options
+- Install ipk
+  - e.g.,: 
+    - `cd /tmp`
+    - HTTPS: `curl -LO https://github.com/pyrovski/wrtbwmon/releases/download/0.3/wrtbwmon_0.3_all.ipk`
+    - HTTP: you're on your own :( Busybox wget usually doesn't have SSL support.
+    - OpenWrt: `opkg install /tmp/wrtbwmon_0.3_all.ipk`
+- Or, if you don't want to use an ipk:
+  - `cd /tmp`
+  - HTTPS: `curl -L https://github.com/pyrovski/wrtbwmon/archive/0.3.tar.gz | tar xvz`
+  - `cd wrtbwmon-0.3`
   - `./install.sh wrtbwmon.sh readDB.awk usage.htm1 usage.htm2 wrtbwmon`
-  - Or, if you have `make`, just `make install`
-  - In the future, there may be an IPK.
+    - Currently, this depends on the `install` program. OpenWrt chose to provide this as the "coreutils-install" package.
+- Or, if you have `make`, just `make install` as root after cloning/unpacking.
+
+
+### Regular updates
 - Add the following to root's crontab:
 
-        # adapt to your needs
+        # adapt PATH to your needs
         PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 	
         * * * * * <script location> update /tmp/usage.db
