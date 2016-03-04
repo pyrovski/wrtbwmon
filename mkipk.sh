@@ -1,6 +1,6 @@
 tmpdir=$(mktemp -d)
 for file in $*; do
-    dest=`egrep ".*: $file( |$)" ./fileMap | cut -d':' -f1`
+    dest=`egrep " $file( |$)" ./fileMap | cut -d':' -f1`
     mkdir -p $tmpdir/$dest
     if [ -n `echo $dest | egrep '/bin$'` ]; then
     	perm=0744
@@ -14,4 +14,4 @@ for file in $*; do
     fi
 done
 fakeroot -- ipkg-build $tmpdir
-rm -rf $tmpdir
+rm -rf "$tmpdir"
