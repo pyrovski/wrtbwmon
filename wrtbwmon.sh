@@ -25,7 +25,33 @@ interfaces='eth0 tun0' # in addition to detected WAN
 DB=$2
 mode=
 
+# don't perform reverse DNS lookups by default
+DO_RDNS=
+# DNS server for reverse lookups
+DNS=
+
 header="#mac,ip,iface,in,out,total,first_date,last_date"
+
+createDbIfMissing()
+{
+    [ ! -f "$DB" ] && echo $header > "$DB"
+}
+
+checkDbArg()
+{
+    [ -z "$DB" ] && echo "ERROR: Missing argument 2 (database file)" && exit 1
+}
+
+checkDB()
+{
+    [ ! -f "$DB" ] && echo "ERROR: $DB does not exist" && exit 1
+    [ ! -w "$DB" ] && echo "ERROR: $DB is not writable" && exit 1   
+}
+
+checkWAN()
+{
+    [ -z "$wan" ] && echo "Warning: failed to detect WAN interface."
+}
 
 lookup()
 {
@@ -49,7 +75,7 @@ lookup()
 	[ -n "$USER" ] && break
     done
     nslookup=`which nslookup`
-    if [ -z "$USER" -a "$IP" != "NA" -a -n "$nslookup" ]; then
+    if [ -n "$DO_RDNS" -a -z "$USER" -a "$IP" != "NA" -a -n "$nslookup" ]; then
 	USER=`$nslookup $IP $DNS | awk '!/server can/{if($4){print $4; exit}}' | sed -re 's/[.]$//'`
     fi
     [ -z "$USER" ] && USER=${MAC}
@@ -156,14 +182,23 @@ newRuleIF()
 
 update()
 {
-    [ -z "$DB" ] && echo "ERROR: Missing argument 2 (database file)" && exit 1	
-    [ ! -w "$DB" ] && echo "ERROR: $DB not writable" && exit 1
-    [ -z "$wan" ] && echo "Warning: failed to detect WAN interface."
+    #!@todo could let readDB.awk handle this; that would place header
+    #!info in fewer places
+    createDbIfMissing
+    
+    checkDB
+    checkWAN
 
     lock
     #!@todo only zero our own chains
     iptables -nvxL -t mangle -Z > /tmp/iptables_$$.tmp
-    awk -v mode="$mode" -v interfaces="$interfaces" -f $binDir/readDB.awk \
+    # echo awk -v mode="$mode" -v interfaces=\""$interfaces"\" -f $binDir/readDB.awk \
+    # 	$DB \
+    # 	/proc/net/arp \
+    # 	/tmp/iptables_$$.tmp
+
+    # exit 1
+    awk -v mode="$mode" -v interfaces=\""$interfaces"\" -f $binDir/readDB.awk \
 	$DB \
 	/proc/net/arp \
 	/tmp/iptables_$$.tmp
@@ -174,13 +209,14 @@ update()
 
 case $1 in
     "dump" )
-	[ -z "$DB" ] && echo "ERROR: Missing database argument" && exit 1
+	checkDbArg
 	lock
 	tr ',' '\t' < "$DB"
 	unlock
     ;;
 
     "update" )
+	checkDbArg
 	wan=$(detectWAN)
 	interfaces="$interfaces $wan"
 	update
@@ -189,10 +225,10 @@ case $1 in
 	;;
 
     "publish" )
-	[ -z "$DB" ] && echo "ERROR: Missing database argument" && exit 1
+	checkDbArg
 	[ -z "$3" ] && echo "ERROR: Missing argument 3" && exit 1
 	
-	# first do some number crunching - rewrite the database so that it is sorted
+	# sort DB
 	lock
 
 	# busybox sort truncates numbers to 32 bits
@@ -220,16 +256,20 @@ $PEAKUSAGE_IN,$PEAKUSAGE_OUT,$TOTAL,\"$FIRSTSEEN\",\"$LASTSEEN\")," >> $3.tmp
 	;;
     
     "setup" )
+	checkDbArg
+	if [ -w "$DB" ]; then
+	    echo "Warning: using existing $DB"
+	else
+	    createDbIfMissing
+	fi
+	
 	for chain in $chains; do
 	    newChain $chain
 	done
 
 	#lan=$(detectLAN)
 	wan=$(detectWAN)
-	if [ -z "$wan" ]; then
-	    echo "Warning: failed to detect WAN interface."
-	    #else wanIP=`ifconfig $wan | grep -o 'inet addr:[0-9.]\+' | cut -d':' -f2`
-	fi
+	checkWAN
 	interfaces="$interfaces $wan"
 
 	# track local data
@@ -250,17 +290,18 @@ $PEAKUSAGE_IN,$PEAKUSAGE_OUT,$TOTAL,\"$FIRSTSEEN\",\"$LASTSEEN\")," >> $3.tmp
 	;;
 
     *)
-	echo "Usage: $0 {setup|update|publish|remove} [options...]"
-	echo "Options: "
-	echo "   $0 setup database_file"
-	echo "   $0 update database_file"
-	echo "   $0 publish database_file path_of_html_report [user_file]"
-	echo "Examples: "
-	echo "   $0 setup /tmp/usage.db"
-	echo "   $0 update /tmp/usage.db"
-	echo "   $0 publish /tmp/usage.db /www/user/usage.htm /jffs/users.txt"
-	echo "   $0 remove"
-	echo "Note: [user_file] is an optional file to match users with MAC addresses."
-	echo "       Its format is: 00:MA:CA:DD:RE:SS,username , with one entry per line"
+	echo \
+"Usage: $0 {setup|update|publish|remove} [options...]
+Options:
+   $0 setup database_file
+   $0 update database_file
+   $0 publish database_file path_of_html_report [user_file]
+Examples:
+   $0 setup /tmp/usage.db
+   $0 update /tmp/usage.db
+   $0 publish /tmp/usage.db /www/user/usage.htm /jffs/users.txt
+   $0 remove
+Note: [user_file] is an optional file to match users with MAC addresses.
+       Its format is \"00:MA:CA:DD:RE:SS,username\", with one entry per line."
 	;;
 esac
