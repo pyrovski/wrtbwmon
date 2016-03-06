@@ -27,14 +27,14 @@ BEGIN {
     split("", mac)
 }
 
-/^#/ {
+/^#/ { # get DB filename
     FS=","
     dbFile=FILENAME
     next
 }
 
 # data from database; first file
-FNR==NR {
+FNR==NR { #!@todo this doesn't help if the DB file is empty.
     if($2 == "NA")
 	#!@todo could get interface IP here
 	n=$1
@@ -62,6 +62,7 @@ FNR==1 {
 
 # arp: ip hw flags hw_addr mask device
 fid==2 {
+    #!@todo regex match IPs and MACs for sanity
     arp_ip    = $1
     arp_flags = $3
     arp_mac   = $4

@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# wrtbwmon: traffic logging tool for OpenWRT-based routers
+# wrtbwmon: traffic logging tool for routers
 #
 # Peter Bailey (peter.eldridge.bailey+wrtbwmon AT gmail.com)
 #
@@ -11,6 +11,7 @@
 
 #!@todo add logger
 #!@todo cache DNS results
+#!@todo use a config file
 
 trap "rm -f /tmp/*_$$.tmp; kill $$" INT
 binDir=/usr/sbin
@@ -160,7 +161,7 @@ update()
     [ -z "$wan" ] && echo "Warning: failed to detect WAN interface."
 
     lock
-    [ ! -f "$DB" ] && echo $header > "$DB"
+    #!@todo only zero our own chains
     iptables -nvxL -t mangle -Z > /tmp/iptables_$$.tmp
     awk -v mode="$mode" -v interfaces="$interfaces" -f $binDir/readDB.awk \
 	$DB \
