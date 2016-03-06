@@ -18,6 +18,10 @@ binDir=/usr/sbin
 dataDir=/usr/share/wrtbwmon
 lockDir=/tmp/wrtbwmon.lock
 pidFile=$lockDir/pid
+networkFuncs=/lib/functions/network.sh
+uci=`which uci 2>/dev/null`
+nslookup=`which nslookup 2>/dev/null`
+nvram=`which nvram 2>/dev/null`
 
 chains='INPUT OUTPUT FORWARD'
 DEBUG=
@@ -74,7 +78,6 @@ lookup()
 	[ "$USER" = "*" ] && USER=
 	[ -n "$USER" ] && break
     done
-    nslookup=`which nslookup`
     if [ -n "$DO_RDNS" -a -z "$USER" -a "$IP" != "NA" -a -n "$nslookup" ]; then
 	USER=`$nslookup $IP $DNS | awk '!/server can/{if($4){print $4; exit}}' | sed -re 's/[.]$//'`
     fi
@@ -84,16 +87,19 @@ lookup()
 
 detectIF()
 {
-    uci=`which uci 2>/dev/null`
-    if [ -n "$uci" -a -x "$uci" ]; then
-	IF=`$uci get network.${1}.ifname 2>/dev/null`
-	[ $? -eq 0 ] && echo $IF && return
+    if [ -f "$networkFuncs" ]; then
+	IF=`. $networkFuncs; network_get_device netdev $1; echo $netdev`
+	[ -n "$IF" ] && echo $IF && return
     fi
 
-    nvram=`which nvram 2>/dev/null`
+    if [ -n "$uci" -a -x "$uci" ]; then
+	IF=`$uci get network.${1}.ifname 2>/dev/null`
+	[ $? -eq 0 -a -n "$IF" ] && echo $IF && return
+    fi
+
     if [ -n "$nvram" -a -x "$nvram" ]; then
 	IF=`$nvram get ${1}_ifname 2>/dev/null`
-	[ $? -eq 0 ] && echo $IF && return
+	[ $? -eq 0 -a -n "$IF" ] && echo $IF && return
     fi
 }
 
@@ -110,6 +116,8 @@ detectWAN()
     wan=$(detectIF wan)
     [ -n "$wan" ] && echo $wan && return
     wan=$(ip route show 2>/dev/null | grep default | sed -re '/^default/ s/default.*dev +([^ ]+).*/\1/')
+    [ -n "$wan" ] && echo $wan && return
+    [ -f "$networkFuncs" ] && wan=$(. $networkFuncs; network_find_wan wan; echo $wan)
     [ -n "$wan" ] && echo $wan && return
 }
 
