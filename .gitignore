@@ -9,3 +9,4 @@ old
 TAGS
 *.tgz
 *.ipk
+.gawk*
