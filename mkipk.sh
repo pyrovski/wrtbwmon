@@ -10,7 +10,7 @@ for file in $*; do
     if [ -d "$file" ]; then
     	install -d -m $perm $file $tmpdir/$dest
     else
-    	install -m $perm $file $tmpdir/$dest/
+    	install -m $perm -t $tmpdir/$dest/ $file
     fi
 done
 fakeroot -- ipkg-build $tmpdir
