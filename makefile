@@ -12,3 +12,5 @@ $(target): $(install-files) $(ipk-files)
 
 install: $(install-files)
 	./install.sh $^
+
+.SUFFIXES:

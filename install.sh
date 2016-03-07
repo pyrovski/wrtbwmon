@@ -15,6 +15,6 @@ for file in $*; do
     if [ -d "$file" ]; then
     	install -d -m $perm $file $DESTDIR/$dest
     else
-    	install -m $perm $file $DESTDIR/$dest/
+    	install -m $perm -t $DESTDIR/$dest/ $file
     fi
 done

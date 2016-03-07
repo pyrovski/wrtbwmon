@@ -176,15 +176,13 @@ newRuleIF()
     chain=$1
     IF=$2
     
-    iptables -t mangle -nvL RRDIPT_$chain | grep " $IF " > /dev/null
-    if [ "$?" -ne 0 ]; then
-	if [ "$chain" = "OUTPUT" ]; then
-	    iptables -t mangle -A RRDIPT_$chain -o $IF -j RETURN
-	elif [ "$chain" = "INPUT" ]; then
-	    iptables -t mangle -A RRDIPT_$chain -i $IF -j RETURN
-	fi
-    elif [ -n "$DEBUG" ]; then
-	echo "DEBUG: table mangle chain $chain rule $IF already exists?"
+    #!@todo test
+    if [ "$chain" = "OUTPUT" ]; then
+	cmd="iptables -t mangle -o $IF -j RETURN"
+	eval $cmd " -C RRDIPT_$chain 2>/dev/null" || eval $cmd " -A RRDIPT_$chain"
+    elif [ "$chain" = "INPUT" ]; then
+	cmd="iptables -t mangle -i $IF -j RETURN"
+	eval $cmd " -C RRDIPT_$chain 2>/dev/null" || eval $cmd " -A RRDIPT_$chain"
     fi
 }
 
@@ -197,9 +195,12 @@ update()
     checkDB
     checkWAN
 
+    > /tmp/iptables_$$.tmp
     lock
-    #!@todo only zero our own chains
-    iptables -nvxL -t mangle -Z > /tmp/iptables_$$.tmp
+    # only zero our own chains
+    for chain in $chains; do
+	iptables -nvxL RRDIPT_$chain -t mangle -Z >> /tmp/iptables_$$.tmp
+    done
     # echo awk -v mode="$mode" -v interfaces=\""$interfaces"\" -f $binDir/readDB.awk \
     # 	$DB \
     # 	/proc/net/arp \

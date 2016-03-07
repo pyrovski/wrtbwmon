@@ -3,8 +3,13 @@ function inInterfaces(host){
 }
 
 function newRule(arp_ip){
-    system("iptables -t mangle -I RRDIPT_FORWARD -d " arp_ip " -j RETURN")
-    system("iptables -t mangle -I RRDIPT_FORWARD -s " arp_ip " -j RETURN")
+    #!@todo test; checking for existing rules shouldn't be necessary
+    #if newRule is always called after db is read, arp table is read,
+    #and existing iptables rules are read.
+    ipt_cmd="iptables -t mangle -j RETURN -s " arp_ip
+    system(ipt_cmd " -C RRDIPT_FORWARD 2>/dev/null || " ipt_cmd " -A RRDIPT_FORWARD")
+    ipt_cmd="iptables -t mangle -j RETURN -d " arp_ip
+    system(ipt_cmd " -C RRDIPT_FORWARD 2>/dev/null || " ipt_cmd " -A RRDIPT_FORWARD")
 }
 
 function total(i){
@@ -24,7 +29,6 @@ BEGIN {
     fid=1
     debug=0
     rrd=0
-    split("", mac)
 }
 
 /^#/ { # get DB filename
@@ -41,13 +45,12 @@ FNR==NR { #!@todo this doesn't help if the DB file is empty.
     else
 	n=$2
 
-    hosts[n] = ""
+    hosts[n] = "" # add this host/interface to hosts
     mac[n]        =  $1
     ip[n]         =  $2
     inter[n]      =  $3
     bw[n "/in"]   =  $4
     bw[n "/out"]  =  $5
-    # total = $6
     firstDate[n]  =  $7
     lastDate[n]   =  $8
     next
@@ -56,7 +59,7 @@ FNR==NR { #!@todo this doesn't help if the DB file is empty.
 # not triggered on the first file
 FNR==1 {
     FS=" "
-    fid++
+    fid++ #!@todo use fid for all files; may be problematic for empty files
     next
 }
 
@@ -89,32 +92,36 @@ fid==3 && $1 == "Chain"{
 
 fid==3 && rrd && (NF < 9 || $1=="pkts"){ next }
 
-# iptables input
-#!@todo if we read this first, the need for new rules will not have to wait until END
-fid==3 && rrd {
+
+#!@todo if we read this first, the need for new rules will not have to
+#wait until END
+fid==3 && rrd { # iptables input
     if($6 != "*"){
-	n=$6 "/out"
 	m=$6
+	n=m "/out"
     } else if($7 != "*"){
-	n=$7 "/in"
 	m=$7
+	n=m "/in"
     } else if($8 != "0.0.0.0/0"){
-	n=$8 "/out"
 	m=$8
+	n=m "/out"
     } else { # $9 != "0.0.0.0/0"
-	n=$9 "/in"
 	m=$9
+	n=m "/in"
     }
+    # remove host from array; any hosts left in array at END get new
+    # iptables rules
     delete hosts[m]
-    if($2 > 0){
+    if($2 > 0){ # counted some bytes
 	if(mode == "diff" || mode == "noUpdate")
 	    print n, $2
 	if(mode!="noUpdate"){
 	    bw[n]+=$2
-	    # compare label to wan input variable
-	    if(inInterfaces(m)){
-		if(!(m in mac)){
-		    firstDate[m]=lastDate[m] = date()
+	    if(inInterfaces(m)){ # if label is an interface
+		if(!(m in mac)){ # if label was not in db (also not in
+				 # arp table, but interfaces won't be
+				 # there anyway)
+		    firstDate[m] = date()
 		    mac[m] = inter[m] = m
 		    ip[m] = "NA"
 		    bw[n]=bw[n]= 0
