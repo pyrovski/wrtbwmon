@@ -70,8 +70,7 @@ fid==2 {
     if(arp_flags != "0x0" && !(arp_ip in ip)){
 	if(debug)
 	    print "new host:", arp_ip, arp_flags > "/dev/stderr"
-	# new host; add rule
-	newRule(arp_ip)
+	hosts[arp_ip] = ""
 	mac[arp_ip]   = arp_mac
 	ip[arp_ip]    = arp_ip
 	inter[arp_ip] = arp_dev
