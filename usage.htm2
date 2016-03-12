@@ -1,15 +1,8 @@
 for (i=0; i < values.length-1; i++) {
-    document.write("<tr><td>" + values[i][0] + "</td>");
-    for (j=1; j < 4; j++)
+    document.write("<tr><td><div title=\"" + values[i][1] + " (" + values[i][2] + ")" + "\">" + values[i][0] + "</div></td>");
+    for (j=3; j < 6; j++)
         document.write("<td>" + getSize(values[i][j]) + "</td>");
-
-    document.write("<td>");
-    document.write(values[i][4]);
-    document.write("</td>");
-    document.write("<td>");
-    document.write(values[i][5]);
-    document.write("</td>");
-    document.write("</tr>");
+    document.write("<td>" + values[i][6] + "</td><td>" + values[i][7] + "</td></tr>");
 }
 </script></table>
 <br /><small>This page was generated on (date)</small>

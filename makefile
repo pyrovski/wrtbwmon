@@ -7,7 +7,6 @@ target=wrtbwmon_$(version)_all.ipk
 all: $(target)
 
 $(target): $(install-files) $(ipk-files)
-	echo $(version)
 	./mkipk.sh $^
 
 install: $(install-files)

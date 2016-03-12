@@ -29,10 +29,9 @@ interfaces='eth0 tun0' # in addition to detected WAN
 DB=$2
 mode=
 
+# DNS server for reverse lookups provided in "DNS".
 # don't perform reverse DNS lookups by default
-DO_RDNS=
-# DNS server for reverse lookups
-DNS=
+DO_RDNS=${DNS-}
 
 header="#mac,ip,iface,in,out,total,first_date,last_date"
 
@@ -201,12 +200,8 @@ update()
     for chain in $chains; do
 	iptables -nvxL RRDIPT_$chain -t mangle -Z >> /tmp/iptables_$$.tmp
     done
-    # echo awk -v mode="$mode" -v interfaces=\""$interfaces"\" -f $binDir/readDB.awk \
-    # 	$DB \
-    # 	/proc/net/arp \
-    # 	/tmp/iptables_$$.tmp
-
-    # exit 1
+    # the iptables and readDB commands have to be separate. Otherwise,
+    # they will fight over iptables locks
     awk -v mode="$mode" -v interfaces=\""$interfaces"\" -f $binDir/readDB.awk \
 	$DB \
 	/proc/net/arp \
@@ -235,7 +230,7 @@ case $1 in
 
     "publish" )
 	checkDbArg
-	[ -z "$3" ] && echo "ERROR: Missing argument 3" && exit 1
+	[ -z "$3" ] && echo "ERROR: Missing argument 3 (output html file)" && exit 1
 	
 	# sort DB
 	lock
@@ -250,7 +245,7 @@ case $1 in
 	while IFS=, read PEAKUSAGE_IN MAC IP IFACE PEAKUSAGE_OUT TOTAL FIRSTSEEN LASTSEEN
 	do
 	    echo "
-new Array(\"$(lookup $MAC $IP $4)\",
+new Array(\"$(lookup $MAC $IP $4)\",\"$MAC\",\"$IP\",
 $PEAKUSAGE_IN,$PEAKUSAGE_OUT,$TOTAL,\"$FIRSTSEEN\",\"$LASTSEEN\")," >> $3.tmp
 	done < /tmp/sorted_$$.tmp
 	echo "0);" >> $3.tmp
@@ -266,11 +261,8 @@ $PEAKUSAGE_IN,$PEAKUSAGE_OUT,$TOTAL,\"$FIRSTSEEN\",\"$LASTSEEN\")," >> $3.tmp
     
     "setup" )
 	checkDbArg
-	if [ -w "$DB" ]; then
-	    echo "Warning: using existing $DB"
-	else
-	    createDbIfMissing
-	fi
+	[ -w "$DB" ] && echo "Warning: using existing $DB"
+	createDbIfMissing
 	
 	for chain in $chains; do
 	    newChain $chain
@@ -296,6 +288,7 @@ $PEAKUSAGE_IN,$PEAKUSAGE_OUT,$TOTAL,\"$FIRSTSEEN\",\"$LASTSEEN\")," >> $3.tmp
 
     "remove" )
 	iptables-save | grep -v RRDIPT | iptables-restore
+	rm -rf "$lockDir"
 	;;
 
     *)

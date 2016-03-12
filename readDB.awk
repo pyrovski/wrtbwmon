@@ -116,7 +116,6 @@ fid==3 && rrd { # iptables input
 	if(mode == "diff" || mode == "noUpdate")
 	    print n, $2
 	if(mode!="noUpdate"){
-	    bw[n]+=$2
 	    if(inInterfaces(m)){ # if label is an interface
 		if(!(m in mac)){ # if label was not in db (also not in
 				 # arp table, but interfaces won't be
@@ -124,9 +123,10 @@ fid==3 && rrd { # iptables input
 		    firstDate[m] = date()
 		    mac[m] = inter[m] = m
 		    ip[m] = "NA"
-		    bw[n]=bw[n]= 0
+		    bw[m "/in"]=bw[m "/out"]= 0
 		}
 	    }
+	    bw[n]+=$2
 	    lastDate[m] = date()
 	}
     }
