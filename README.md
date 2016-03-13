@@ -2,6 +2,7 @@
 Modified from https://code.google.com/p/wrtbwmon/.
 
 ## New features
+ - "User" column has mouseover text containing MAC and IP addresses
  - "First seen" and "Total" columns in usage table
  - Monitoring of locally generated traffic on a per-interface basis
  - `remove` function to delete `iptables` rules
@@ -36,6 +37,14 @@ Here is an example usage table:
     - Currently, this depends on the `install` program. OpenWrt chose to provide this as the "coreutils-install" package.
 - Or, if you have `make`, just `make install` as root after cloning/unpacking.
 
+### Configuring the published table
+- `wrtbwmon.sh` checks a few files for MAC -> name maps:
+  - 4th argument to `wrtbwmon.sh publish <DB> <userDB>`
+  - `/tmp/dhcp.leases`
+  - `/tmp/dnsmasq.conf`
+  - `/etc/dnsmasq.conf`
+  - `/etc/hosts`
+- If all of the above do not yield a match, the script will optionally perform a reverse DNS lookup directed at the DNS server specified in the `DNS` variable. If `DNS` is blank or unset, the script will not perform such lookups.
 
 ### Regular updates
 - Add the following to root's crontab:
