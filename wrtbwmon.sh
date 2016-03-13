@@ -153,18 +153,13 @@ unlock()
 newChain()
 {
     chain=$1
-
-    #Create the RRDIPT_$chain chain (it doesn't matter if it already exists).
+    # Create the RRDIPT_$chain chain (it doesn't matter if it already exists).
     iptables -t mangle -N RRDIPT_$chain 2> /dev/null
     
-    #Add the RRDIPT_$chain CHAIN to the $chain chain (if non existing).
-    iptables -t mangle -L $chain --line-numbers -n | grep "RRDIPT_$chain" > /dev/null
+    # Add the RRDIPT_$chain CHAIN to the $chain chain if not present
+    iptables -t mangle -C $chain -j RRDIPT_$chain 2>/dev/null
     if [ $? -ne 0 ]; then
-	iptables -t mangle -L $chain -n | grep "RRDIPT_$chain" > /dev/null
-	if [ $? -eq 0 ]; then
-	    [ -n "$DEBUG" ] && echo "DEBUG: iptables chain misplaced, recreating it..."
-	    iptables -t mangle -D $chain -j RRDIPT_$chain
-	fi
+	[ -n "$DEBUG" ] && echo "DEBUG: iptables chain misplaced, recreating it..."
 	iptables -t mangle -I $chain -j RRDIPT_$chain
     fi
 }

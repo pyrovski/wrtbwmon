@@ -2,10 +2,11 @@ function inInterfaces(host){
     return(interfaces ~ "(^| )"host"($| )")
 }
 
-function newRule(arp_ip){
-    #!@todo test; checking for existing rules shouldn't be necessary
-    #if newRule is always called after db is read, arp table is read,
-    #and existing iptables rules are read.
+function newRule(arp_ip,
+    ipt_cmd){
+    # checking for existing rules shouldn't be necessary if newRule is
+    # always called after db is read, arp table is read, and existing
+    # iptables rules are read.
     ipt_cmd="iptables -t mangle -j RETURN -s " arp_ip
     system(ipt_cmd " -C RRDIPT_FORWARD 2>/dev/null || " ipt_cmd " -A RRDIPT_FORWARD")
     ipt_cmd="iptables -t mangle -j RETURN -d " arp_ip
@@ -16,11 +17,11 @@ function total(i){
     return(bw[i "/in"] + bw[i "/out"])
 }
 
-function date(){
+function date(    cmd, d){
     cmd="date +%d-%m-%Y_%H:%M:%S"
     cmd | getline d
     close(cmd)
-#!@todo could start a process with "while true; do date ...; done"
+    #!@todo could start a process with "while true; do date ...; done"
     return(d)
 }
 
@@ -77,11 +78,17 @@ fid==2 {
 	mac[arp_ip]   = arp_mac
 	ip[arp_ip]    = arp_ip
 	inter[arp_ip] = arp_dev
-	bw[arp_ip "/in"]=bw[arp_ip "/out"] = 0
-	firstDate[arp_ip]=lastDate[arp_ip] = date()
+	bw[arp_ip "/in"] = bw[arp_ip "/out"] = 0
+	firstDate[arp_ip] = lastDate[arp_ip] = date()
     }
     next
 }
+
+#!@todo could use mangle chain totals or tailing "unnact" rules to
+# account for data for new hosts from their first presence on the
+# network to rule creation. The "unnact" rules would have to be
+# maintained at the end of the list, and new rules would be inserted
+# at the top.
 
 # skip line
 # read the chain name and deal with the data accordingly
@@ -92,9 +99,6 @@ fid==3 && $1 == "Chain"{
 
 fid==3 && rrd && (NF < 9 || $1=="pkts"){ next }
 
-
-#!@todo if we read this first, the need for new rules will not have to
-#wait until END
 fid==3 && rrd { # iptables input
     if($6 != "*"){
 	m=$6
@@ -109,9 +113,14 @@ fid==3 && rrd { # iptables input
 	m=$9
 	n=m "/in"
     }
+
     # remove host from array; any hosts left in array at END get new
     # iptables rules
+
+    #!@todo this deletes a host if any rule exists; if only one
+    # directional rule is removed, this will not remedy the situation
     delete hosts[m]
+
     if($2 > 0){ # counted some bytes
 	if(mode == "diff" || mode == "noUpdate")
 	    print n, $2
@@ -133,18 +142,14 @@ fid==3 && rrd { # iptables input
 }
 
 END {
-    if(mode=="noUpdate")
-	exit
+    if(mode=="noUpdate") exit
     close(dbFile)
     system("rm -f " dbFile)
     print "#mac,ip,iface,in,out,total,first_date,last_date" > dbFile
     OFS=","
     for(i in mac)
 	print mac[i], ip[i], inter[i], bw[i "/in"], bw[i "/out"], total(i), firstDate[i], lastDate[i] > dbFile
-
+    close(dbFile)
     # for hosts without rules
-    for(host in hosts){
-	if(!inInterfaces(host))
-	    newRule(host)
-    }
+    for(host in hosts) if(!inInterfaces(host)) newRule(host)
 }
