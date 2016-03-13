@@ -12,6 +12,9 @@ It accomplishes this with `iptables` rules, which means you don't need to run an
 `wrtbwmon` conveniently tracks bandwidth consumption on a per-IP address basis, 
 so you can easily determine which user/device is the culprit.
 
+Here is an example usage table:
+![image](example.png)
+
 ### How do I use it?
 - Install: Download and install ipk from the [releases page](https://github.com/pyrovski/wrtbwmon/releases/)
 - Setup: `wrtbwmon.sh setup`
