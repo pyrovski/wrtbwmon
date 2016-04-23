@@ -236,7 +236,8 @@ case $1 in
         # create HTML page
 	rm -f $3.tmp
 	cp $dataDir/usage.htm1 $3.tmp
-	
+
+	#!@todo fix publishing
 	while IFS=, read PEAKUSAGE_IN MAC IP IFACE PEAKUSAGE_OUT TOTAL FIRSTSEEN LASTSEEN
 	do
 	    echo "
