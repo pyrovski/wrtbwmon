@@ -5,15 +5,15 @@
 
 # Configure our cron
 if [ -d "/etc/crontabs" ]; then
-  echo "PATH=/usr/sbin:/usr/bin:/sbin:/bin" > wrtbwmon
-  echo "* * * * * /usr/sbin/wrtbwmon.sh update /tmp/usage.db" >> wrtbwmon
-  echo "0 * * * * /usr/sbin/wrtbwmon.sh publish /tmp/usage.db /tmp/usage.htm" >> wrtbwmon
+  echo "PATH=/usr/sbin:/usr/bin:/sbin:/bin" > /etc/crontabs/wrtbwmon
+  echo "* * * * * /usr/sbin/wrtbwmon.sh update /tmp/usage.db" >> /etc/crontabs/wrtbwmon
+  echo "0 * * * * /usr/sbin/wrtbwmon.sh publish /tmp/usage.db /tmp/usage.htm" >> /etc/crontabs/wrtbwmon
 fi
 /etc/init.d/cron reload
 
 # Symlink to our webdir
 if [ -d "/var/www/html" ]; then
-  ln -s /tmp/usage.htm /www/usage.htm
+  ln -s /tmp/usage.htm /var/www/html/usage.htm
 elif [ -d "/www" ]; then
  ln -s /tmp/usage.htm /www/usage.htm
 fi
