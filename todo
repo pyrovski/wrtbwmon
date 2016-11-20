@@ -1,0 +1,5 @@
+- add logger
+- cache DNS results
+- use a config file
+- check for existence of tool dependencies before using them
+- fix DNS reverse lookups for systems without nslookup

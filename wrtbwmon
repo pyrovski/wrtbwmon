@@ -9,10 +9,6 @@
 # Fredrik Erlandsson (erlis AT linux.nu)
 # twist - http://wiki.openwrt.org/RrdTrafficWatch
 
-#!@todo add logger
-#!@todo cache DNS results
-#!@todo use a config file
-
 trap "rm -f /tmp/*_$$.tmp; kill $$" INT
 binDir=/usr/sbin
 dataDir=/usr/share/wrtbwmon
