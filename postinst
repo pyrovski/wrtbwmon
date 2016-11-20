@@ -6,8 +6,8 @@
 # Configure our cron
 if [ -d "/etc/crontabs" ]; then
   echo "PATH=/usr/sbin:/usr/bin:/sbin:/bin" > /etc/crontabs/wrtbwmon
-  echo "* * * * * /usr/sbin/wrtbwmon.sh update /tmp/usage.db" >> /etc/crontabs/wrtbwmon
-  echo "0 * * * * /usr/sbin/wrtbwmon.sh publish /tmp/usage.db /tmp/usage.htm" >> /etc/crontabs/wrtbwmon
+  echo "* * * * * /usr/sbin/wrtbwmon update /tmp/usage.db" >> /etc/crontabs/wrtbwmon
+  echo "0 * * * * /usr/sbin/wrtbwmon publish /tmp/usage.db /tmp/usage.htm" >> /etc/crontabs/wrtbwmon
 fi
 /etc/init.d/cron reload
 

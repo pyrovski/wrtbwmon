@@ -18,9 +18,9 @@ Here is an example usage table:
 
 ### How do I use it?
 - Install: Download and install ipk from the [releases page](https://github.com/pyrovski/wrtbwmon/releases/)
-- Setup: `wrtbwmon.sh setup`
-- Update table: `wrtbwmon.sh update /tmp/usage.db` (you can place the data table anywhere)
-- Create html page: `wrtbwmon.sh publish /tmp/usage.db /tmp/usage.htm`
+- Setup: `wrtbwmon setup`
+- Update table: `wrtbwmon update /tmp/usage.db` (you can place the data table anywhere)
+- Create html page: `wrtbwmon publish /tmp/usage.db /tmp/usage.htm`
 
 ### Installation options
 - Install ipk
@@ -33,13 +33,13 @@ Here is an example usage table:
   - `cd /tmp`
   - HTTPS: `curl -L https://github.com/pyrovski/wrtbwmon/archive/0.3.tar.gz | tar xvz`
   - `cd wrtbwmon-0.3`
-  - `./install.sh wrtbwmon.sh readDB.awk usage.htm1 usage.htm2 wrtbwmon`
+  - `./install.sh wrtbwmon readDB.awk usage.htm1 usage.htm2 wrtbwmon`
     - Currently, this depends on the `install` program. OpenWrt chose to provide this as the "coreutils-install" package.
 - Or, if you have `make`, just `make install` as root after cloning/unpacking.
 
 ### Configuring the published table
-- `wrtbwmon.sh` checks a few files for MAC -> name maps:
-  - 4th argument to `wrtbwmon.sh publish <DB> <userDB>`
+- `wrtbwmon` checks a few files for MAC -> name maps:
+  - 4th argument to `wrtbwmon publish <DB> <userDB>`
   - `/tmp/dhcp.leases`
   - `/tmp/dnsmasq.conf`
   - `/etc/dnsmasq.conf`
@@ -60,4 +60,4 @@ Here is an example usage table:
     - ln -s /tmp/usage.htm /var/www/html/
 
 ### Remove `iptables` rules
- - `wrtbwmon.sh remove`
+ - `wrtbwmon remove`

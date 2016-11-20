@@ -1,3 +1,5 @@
+#!/usr/bin/awk
+
 function inInterfaces(host){
     return(interfaces ~ "(^| )"host"($| )")
 }

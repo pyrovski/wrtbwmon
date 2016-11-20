@@ -1,5 +1,5 @@
 DESTDIR?=/
-install-files=wrtbwmon.sh readDB.awk $(wildcard usage.htm*) wrtbwmon
+install-files=wrtbwmon readDB.awk $(wildcard usage.htm*) init/wrtbwmon
 ipk-files=control
 version:=$(shell egrep '^Version:' ./control | awk '{print $$2}')
 target=wrtbwmon_$(version)_all.ipk

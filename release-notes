@@ -1,4 +1,4 @@
-- transition from invocation as "wrtbwmon" to "wrtbwmon.sh"
+- transition from invocation as "wrtbwmon.sh" back to "wrtbwmon"
 - update readme
 - add ipk
 - install files according a standard filesystem layout
