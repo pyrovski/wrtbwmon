@@ -21,6 +21,8 @@ Here is an example usage table:
 - Setup: `wrtbwmon setup`
 - Update table: `wrtbwmon update /tmp/usage.db` (you can place the data table anywhere)
 - Create html page: `wrtbwmon publish /tmp/usage.db /tmp/usage.htm`
+- Dump table to terminal: `wrtbwmon dump /tmp/usage.db`
+- Remove: `wrtbwmon remove`
 
 ### Installation options
 - Install ipk
