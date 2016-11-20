@@ -1,1 +1,5 @@
-2016-02-19: Added ipk and install targets with default paths for scripts and resources.
+wrtbwmon (0.34) UNRELEASED; urgency=low
+
+  * Added ipk and install targets with default paths for scripts and resources.
+
+ -- Peter Bailey <peter.eldridge.bailey@gmail.com>  Sat, 19 Feb 2016 00:00:00 -0800
