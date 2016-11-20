@@ -26,13 +26,14 @@ Here is an example usage table:
 - Install ipk
   - e.g.,: 
     - `cd /tmp`
-    - HTTPS: `curl -LO https://github.com/pyrovski/wrtbwmon/releases/download/0.3/wrtbwmon_0.3_all.ipk`
+    - HTTPS: `curl -LO https://github.com/pyrovski/wrtbwmon/releases/download/0.35/wrtbwmon_0.35_all.ipk`
     - HTTP: you're on your own :( Busybox wget usually doesn't have SSL support.
-    - OpenWrt: `opkg install /tmp/wrtbwmon_0.3_all.ipk`
-- Or, if you don't want to use an ipk:
+    - OpenWrt: `opkg install /tmp/wrtbwmon_0.35_all.ipk`
+- Install deb from [the releases page](https://github.com/pyrovski/wrtbwmon/releases)
+- Or, if you don't want to use an ipk or a deb:
   - `cd /tmp`
-  - HTTPS: `curl -L https://github.com/pyrovski/wrtbwmon/archive/0.3.tar.gz | tar xvz`
-  - `cd wrtbwmon-0.3`
+  - HTTPS: `curl -L https://github.com/pyrovski/wrtbwmon/archive/0.35.tar.gz | tar xvz`
+  - `cd wrtbwmon-0.35`
   - `./install.sh wrtbwmon readDB.awk usage.htm1 usage.htm2 wrtbwmon`
     - Currently, this depends on the `install` program. OpenWrt chose to provide this as the "coreutils-install" package.
 - Or, if you have `make`, just `make install` as root after cloning/unpacking.

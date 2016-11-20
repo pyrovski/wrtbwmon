@@ -1,0 +1,6 @@
+# TODO: share this between makefile/ipk/deb
+wrtbwmon /usr/sbin
+readDB.awk /usr/sbin
+usage.htm1 /usr/share/wrtbwmon
+usage.htm2 /usr/share/wrtbwmon
+init/wrtbwmon /etc/init.d

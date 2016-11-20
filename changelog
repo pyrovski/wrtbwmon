@@ -1,4 +1,10 @@
-wrtbwmon (0.34) UNRELEASED; urgency=low
+wrtbwmon (0.35) unstable; urgency=low
+
+  * Added deb package, changed back to wrtbwmon from wrtbwmon.sh
+
+ -- Peter Bailey <peter.eldridge.bailey@gmail.com>  Sun, 20 Nov 2016 00:58:09 -0800
+
+wrtbwmon (0.34) unstable; urgency=low
 
   * Added ipk and install targets with default paths for scripts and resources.
 

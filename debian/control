@@ -1,0 +1,17 @@
+Source: wrtbwmon
+Maintainer: Peter Bailey <peter.eldridge.bailey@gmail.com>
+Section: net
+Priority: optional
+Standards-Version: 3.9.7
+Build-Depends: debhelper (>= 9)
+
+Package: wrtbwmon
+Architecture: all
+Depends: iproute2 | iproute, iptables, ${shlibs:Depends}, ${misc:Depends}, 
+Description: iptables-based bandwidth monitor
+ wrtbwmon was designed to track bandwidth consumption on home
+ routers. It accomplishes this with iptables rules, which means you
+ don't need to run an extra process just to track bandwidth. wrtbwmon
+ conveniently tracks bandwidth consumption on a per-IP address basis,
+ so you can easily determine which user/device is the culprit.
+ 
