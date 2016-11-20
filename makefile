@@ -12,4 +12,9 @@ $(target): $(install-files) $(ipk-files)
 install: $(install-files)
 	./install.sh $^
 
+deb:
+	gbp buildpackage -Pdebian --git-ignore-new
+
+.PHONY: deb install
+
 .SUFFIXES:
