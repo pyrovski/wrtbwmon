@@ -14,4 +14,3 @@ Description: iptables-based bandwidth monitor
  don't need to run an extra process just to track bandwidth. wrtbwmon
  conveniently tracks bandwidth consumption on a per-IP address basis,
  so you can easily determine which user/device is the culprit.
- 
