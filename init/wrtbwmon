@@ -14,9 +14,9 @@
 START=91
 
 start(){
-    /usr/sbin/wrtbwmon.sh setup /tmp/usage.db
+    /usr/sbin/wrtbwmon setup /tmp/usage.db
 }
 
 stop(){
-    /usr/sbin/wrtbwmon.sh remove
+    /usr/sbin/wrtbwmon remove
 }
