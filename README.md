@@ -58,9 +58,15 @@ Here is an example usage table:
         * * * * * <script location> update /tmp/usage.db
         0 * * * * <script location> publish /tmp/usage.db /tmp/usage.htm
 
+- On OpenWRT you need to [enable cron](https://wiki.openwrt.org/doc/howto/cron#activating_cron) as it is disabled by default:
+
+        /etc/init.d/cron start
+        /etc/init.d/cron enable
+
 - Enable web serving of the generated page (optional)
-  - This varies by environment, but for lighttpd:
-    - ln -s /tmp/usage.htm /var/www/html/
+  This varies by environment, but for lighttpd:
+         
+        ln -s /tmp/usage.htm /var/www/html/
 
 ### Remove `iptables` rules
  - `wrtbwmon remove`
