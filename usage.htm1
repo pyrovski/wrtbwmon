@@ -1,4 +1,5 @@
 <html><head><title>Traffic</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootswatch/3.3.6/simplex/bootstrap.min.css" rel="stylesheet">
 <script type="text/javascript">
 function getSize(size) {
     var prefix=new Array("","k","M","G","T","P","E","Z"); var base=1000;
@@ -10,7 +11,7 @@ function getSize(size) {
     return (Math.round(size*precision)/precision)+' '+prefix[pos];}
 </script></head>
 <body><h1>Total Usage:</h1>
-<table border="1">
+<table class="table table-bordered">
 <tr bgcolor=silver>
 <th>User</th>
 <th>Download</th>
