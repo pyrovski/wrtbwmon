@@ -4,14 +4,18 @@ function inInterfaces(host){
     return(interfaces ~ "(^| )"host"($| )")
 }
 
-function newRule(arp_ip,
-    ipt_cmd){
+function newRule(arp_ip, ipt_cmd){
     # checking for existing rules shouldn't be necessary if newRule is
     # always called after db is read, arp table is read, and existing
     # iptables rules are read.
-    ipt_cmd="iptables -t mangle -j RETURN -s " arp_ip
+    ipt_bin="iptables"
+    if (index(arp_ip, ":")) {
+        ipt_bin="ip6tables"
+    }
+
+    ipt_cmd=ipt_bin " -t mangle -j RETURN -s " arp_ip
     system(ipt_cmd " -C RRDIPT_FORWARD 2>/dev/null || " ipt_cmd " -A RRDIPT_FORWARD")
-    ipt_cmd="iptables -t mangle -j RETURN -d " arp_ip
+    ipt_cmd=ipt_bin " -t mangle -j RETURN -d " arp_ip
     system(ipt_cmd " -C RRDIPT_FORWARD 2>/dev/null || " ipt_cmd " -A RRDIPT_FORWARD")
 }
 
@@ -19,7 +23,7 @@ function total(i){
     return(bw[i "/in"] + bw[i "/out"])
 }
 
-function date(    cmd, d){
+function date(cmd, d){
     cmd="date +%d-%m-%Y_%H:%M:%S"
     cmd | getline d
     close(cmd)
@@ -86,6 +90,25 @@ fid==2 {
     next
 }
 
+# ipv6 neighbours: ip "dev" device "lladr" hw_addr state
+fid==3 {
+    ndp_ip    = $1
+    ndp_dev   = $3
+    ndp_mac   = $5
+    ndp_state = $6
+    if(ndp_state == "REACHABLE" && !(ndp_ip in ip)){
+	if(debug)
+	    print "new host:", ndp_ip, ndp_state > "/dev/stderr"
+	hosts[ndp_ip] = ""
+	mac[ndp_ip]   = ndp_mac
+	ip[ndp_ip]    = ndp_ip
+	inter[ndp_ip] = ndp_dev
+	bw[ndp_ip "/in"] = bw[ndp_ip "/out"] = 0
+	firstDate[ndp_ip] = lastDate[ndp_ip] = date()
+    }
+    next
+}
+
 #!@todo could use mangle chain totals or tailing "unnact" rules to
 # account for data for new hosts from their first presence on the
 # network to rule creation. The "unnact" rules would have to be
@@ -94,28 +117,45 @@ fid==2 {
 
 # skip line
 # read the chain name and deal with the data accordingly
-fid==3 && $1 == "Chain"{
+fid==4 && $1 == "Chain"{
     rrd=$2 ~ /RRDIPT_.*/
     next
 }
 
-fid==3 && rrd && (NF < 9 || $1=="pkts"){ next }
+# ip6tables leves the "opt" column ($5) blank, 
+# so it's table entires have 8 fields
+fid==4 && rrd && ($1=="pkts" || NF < 8){ next }
 
-fid==3 && rrd { # iptables input
-    if($6 != "*"){
-	m=$6
-	n=m "/out"
-    } else if($7 != "*"){
-	m=$7
-	n=m "/in"
-    } else if($8 != "0.0.0.0/0"){
-	m=$8
-	n=m "/out"
-    } else { # $9 != "0.0.0.0/0"
-	m=$9
-	n=m "/in"
+fid==4 && rrd { # iptables input
+    if(NF==9){
+        if($6 != "*"){
+            m=$6
+            n=m "/out"
+        } else if($7 != "*"){
+            m=$7
+            n=m "/in"
+        } else if($8 != "0.0.0.0/0"){
+            m=$8
+            n=m "/out"
+        } else { # $9 != "0.0.0.0/0"
+            m=$9
+            n=m "/in"
+        }
+    } else if(NF==8){
+        if($5 != "*"){
+            m=$5
+            n=m "/out"
+        } else if($6 != "*"){
+            m=$6
+            n=m "/in"
+        } else if($7 != "::/0"){
+            m=$7
+            n=m "/out"
+        } else { # $8 != "::/0"
+            m=$8
+            n=m "/in"
+        }
     }
-
     # remove host from array; any hosts left in array at END get new
     # iptables rules
 

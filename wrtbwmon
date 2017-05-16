@@ -19,6 +19,11 @@ uci=`which uci 2>/dev/null`
 nslookup=`which nslookup 2>/dev/null`
 nvram=`which nvram 2>/dev/null`
 
+# we need the full version of ip, not busybox
+if !(ip -V 2>&1 | grep -iq busybox); then
+    ipv6=1
+fi
+
 chains='INPUT OUTPUT FORWARD'
 DEBUG=
 interfaces='eth0 tun0' # in addition to detected WAN
@@ -149,14 +154,15 @@ unlock()
 newChain()
 {
     chain=$1
+    iptables=$2
     # Create the RRDIPT_$chain chain (it doesn't matter if it already exists).
-    iptables -t mangle -N RRDIPT_$chain 2> /dev/null
+    $iptables -t mangle -N RRDIPT_$chain 2> /dev/null
     
     # Add the RRDIPT_$chain CHAIN to the $chain chain if not present
-    iptables -t mangle -C $chain -j RRDIPT_$chain 2>/dev/null
+    $iptables -t mangle -C $chain -j RRDIPT_$chain 2>/dev/null
     if [ $? -ne 0 ]; then
 	[ -n "$DEBUG" ] && echo "DEBUG: iptables chain misplaced, recreating it..."
-	iptables -t mangle -I $chain -j RRDIPT_$chain
+	$iptables -t mangle -I $chain -j RRDIPT_$chain
     fi
 }
 
@@ -165,6 +171,7 @@ newRuleIF()
 {
     chain=$1
     IF=$2
+    iptables=$3
     
     #!@todo test
     if [ "$chain" = "OUTPUT" ]; then
@@ -185,17 +192,25 @@ update()
     checkDB
     checkWAN
 
+    > /tmp/ipv6_neighbours_$$.tmp
+    if [ $ipv6 -eq 1 ]; then
+        ip -6 neighbour show > /tmp/ipv6_neighbours_$$.tmp 2>/dev/null
+    fi
     > /tmp/iptables_$$.tmp
     lock
     # only zero our own chains
     for chain in $chains; do
 	iptables -nvxL RRDIPT_$chain -t mangle -Z >> /tmp/iptables_$$.tmp
+	if [ $ipv6 -eq 1 ]; then 
+            ip6tables -nvxL RRDIPT_$chain -t mangle -Z >> /tmp/iptables_$$.tmp
+        fi
     done
     # the iptables and readDB commands have to be separate. Otherwise,
     # they will fight over iptables locks
     awk -v mode="$mode" -v interfaces=\""$interfaces"\" -f $binDir/readDB.awk \
 	$DB \
 	/proc/net/arp \
+	/tmp/ipv6_neighbours_$$.tmp \
 	/tmp/iptables_$$.tmp
     unlock
 }
@@ -257,7 +272,10 @@ $PEAKUSAGE_IN,$PEAKUSAGE_OUT,$TOTAL,\"$FIRSTSEEN\",\"$LASTSEEN\")," >> $3.tmp
 	createDbIfMissing
 	
 	for chain in $chains; do
-	    newChain $chain
+	    newChain $chain iptables
+	    if [ $ipv6 -eq 1 ]; then
+	        newChain $chain ip6tables
+            fi
 	done
 
 	#lan=$(detectLAN)
@@ -268,7 +286,8 @@ $PEAKUSAGE_IN,$PEAKUSAGE_OUT,$TOTAL,\"$FIRSTSEEN\",\"$LASTSEEN\")," >> $3.tmp
 	# track local data
 	for chain in INPUT OUTPUT; do
 	    for interface in $interfaces; do
-		[ -n "$interface" ] && [ -e "/sys/class/net/$interface" ] && newRuleIF $chain $interface
+		[ -n "$interface" ] && [ -e "/sys/class/net/$interface" ] && newRuleIF $chain $interface iptables
+		[ $ipv6 -eq 1 ] && [ -n "$interface" ] && [ -e "/sys/class/net/$interface" ] && newRuleIF $chain $interface iptables
 	    done
 	done
 
@@ -280,6 +299,9 @@ $PEAKUSAGE_IN,$PEAKUSAGE_OUT,$TOTAL,\"$FIRSTSEEN\",\"$LASTSEEN\")," >> $3.tmp
 
     "remove" )
 	iptables-save | grep -v RRDIPT | iptables-restore
+	if [ $ipv6 -eq 1 ]; then
+            ip6tables-save | grep -v RRDIPT | ip6tables-restore 
+	fi
 	rm -rf "$lockDir"
 	;;
 
