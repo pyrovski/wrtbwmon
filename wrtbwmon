@@ -18,9 +18,12 @@ networkFuncs=/lib/functions/network.sh
 uci=`which uci 2>/dev/null`
 nslookup=`which nslookup 2>/dev/null`
 nvram=`which nvram 2>/dev/null`
+ip=/usr/sbin/ip
+[ -x $ip ] || ip=`which ip`
 
 # we need the full version of ip, not busybox
-if !(ip -V 2>&1 | grep -iq busybox); then
+ipv6=0
+if !($ip -V 2>&1 | grep -iq busybox); then
     ipv6=1
 fi
 
@@ -62,7 +65,7 @@ lookup()
     MAC=$1
     IP=$2
     userDB=$3
-    for USERSFILE in $userDB /tmp/dhcp.leases /tmp/dnsmasq.conf /etc/dnsmasq.conf /etc/hosts; do
+    for USERSFILE in $userDB /tmp/dhcp.leases /tmp/hosts/dhcp.* /tmp/dnsmasq.conf /etc/dnsmasq.conf /etc/hosts; do
 	[ -e "$USERSFILE" ] || continue
 	case $USERSFILE in
 	    /tmp/dhcp.leases )
@@ -80,6 +83,9 @@ lookup()
     done
     if [ -n "$DO_RDNS" -a -z "$USER" -a "$IP" != "NA" -a -n "$nslookup" ]; then
 	USER=`$nslookup $IP $DNS | awk '!/server can/{if($4){print $4; exit}}' | sed -re 's/[.]$//'`
+    fi
+    if [ -n "$DO_RDNS" -a -z "$USER" ]; then
+	USER=`$nslookup $(grep $MAC /proc/net/arp | awk '{print $1}') $DNS | awk '!/server can/{if($4){print $4; exit}}' | sed -re 's/[.]$//'`
     fi
     [ -z "$USER" ] && USER=${MAC}
     echo $USER
@@ -192,12 +198,15 @@ update()
     checkDB
     checkWAN
 
+    lock
+
     > /tmp/ipv6_neighbours_$$.tmp
     if [ $ipv6 -eq 1 ]; then
-        ip -6 neighbour show > /tmp/ipv6_neighbours_$$.tmp 2>/dev/null
+        $ip -6 neighbour show > /tmp/ipv6_neighbours_$$.tmp 2>/dev/null
     fi
+
     > /tmp/iptables_$$.tmp
-    lock
+
     # only zero our own chains
     for chain in $chains; do
 	iptables -nvxL RRDIPT_$chain -t mangle -Z >> /tmp/iptables_$$.tmp
@@ -205,9 +214,11 @@ update()
             ip6tables -nvxL RRDIPT_$chain -t mangle -Z >> /tmp/iptables_$$.tmp
         fi
     done
+
     # the iptables and readDB commands have to be separate. Otherwise,
     # they will fight over iptables locks
-    awk -v mode="$mode" -v interfaces=\""$interfaces"\" -f $binDir/readDB.awk \
+    awk -v mode="$mode" -v interfaces=\""$interfaces"\" -v ipv6="$ipv6" \
+	-f $binDir/readDB.awk \
 	$DB \
 	/proc/net/arp \
 	/tmp/ipv6_neighbours_$$.tmp \

@@ -92,6 +92,10 @@ fid==2 {
 
 # ipv6 neighbours: ip "dev" device "lladr" hw_addr state
 fid==3 {
+    if (ipv6 == 0) {
+        fid++;
+	next;
+    }
     ndp_ip    = $1
     ndp_dev   = $3
     ndp_mac   = $5
