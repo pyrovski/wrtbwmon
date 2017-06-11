@@ -42,6 +42,11 @@ BEGIN {
 
 # data from database; first file
 FNR==NR { #!@todo this doesn't help if the DB file is empty.
+#!@todo dynamic IPs are annoying.
+# We should track device by MAC, not just IP. However, interfaces can have 
+# multiple IPs, so we need to keep rules around for all recent IPs. Because rule
+# IPs currently match table IPs, perhaps the UI can add up the values between 
+# multiple IPs per MAC address?
     if($2 == "NA")
 	#!@todo could get interface IP here
 	n=$1
@@ -154,4 +159,5 @@ END {
     close(dbFile)
     # for hosts without rules
     for(host in hosts) if(!inInterfaces(host)) newRule(host)
+    #!@todo remove rules for stale IPs
 }
