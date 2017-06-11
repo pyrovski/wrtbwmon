@@ -58,23 +58,23 @@ lookup()
     IP=$2
     userDB=$3
     for USERSFILE in $userDB /tmp/dhcp.leases /tmp/dnsmasq.conf /etc/dnsmasq.conf /etc/hosts; do
-	[ -e "$USERSFILE" ] || continue
-	case $USERSFILE in
-	    /tmp/dhcp.leases )
-		USER=$(grep -i "$MAC" $USERSFILE | cut -f4 -s -d' ')
-		;;
-	    /etc/hosts )
-		USER=$(grep "^$IP " $USERSFILE | cut -f2 -s -d' ')
-		;;
-	    * )
-		USER=$(grep -i "$MAC" "$USERSFILE" | cut -f2 -s -d,)
-		;;
-	esac
-	[ "$USER" = "*" ] && USER=
-	[ -n "$USER" ] && break
+        [ -e "$USERSFILE" ] || continue
+        case $USERSFILE in
+            /tmp/dhcp.leases )
+                USER=$(grep -i "$MAC" $USERSFILE | cut -f4 -s -d' ')
+                ;;
+            /etc/hosts )
+                USER=$(grep "^$IP " $USERSFILE | cut -f2 -s -d' ')
+                ;;
+            * )
+                USER=$(grep -i "$MAC" "$USERSFILE" | cut -f2 -s -d,)
+                ;;
+        esac
+        [ "$USER" = "*" ] && USER=
+        [ -n "$USER" ] && break
     done
     if [ -n "$DO_RDNS" -a -z "$USER" -a "$IP" != "NA" -a -n "$nslookup" ]; then
-	USER=`$nslookup $IP $DNS | awk '!/server can/{if($4){print $4; exit}}' | sed -re 's/[.]$//'`
+        USER=`$nslookup $IP $DNS | awk '!/server can/{if($4){print $4; exit}}' | sed -re 's/[.]$//'`
     fi
     [ -z "$USER" ] && USER=${MAC}
     echo $USER
@@ -83,18 +83,18 @@ lookup()
 detectIF()
 {
     if [ -f "$networkFuncs" ]; then
-	IF=`. $networkFuncs; network_get_device netdev $1; echo $netdev`
-	[ -n "$IF" ] && echo $IF && return
+        IF=`. $networkFuncs; network_get_device netdev $1; echo $netdev`
+        [ -n "$IF" ] && echo $IF && return
     fi
 
     if [ -n "$uci" -a -x "$uci" ]; then
-	IF=`$uci get network.${1}.ifname 2>/dev/null`
-	[ $? -eq 0 -a -n "$IF" ] && echo $IF && return
+        IF=`$uci get network.${1}.ifname 2>/dev/null`
+        [ $? -eq 0 -a -n "$IF" ] && echo $IF && return
     fi
 
     if [ -n "$nvram" -a -x "$nvram" ]; then
-	IF=`$nvram get ${1}_ifname 2>/dev/null`
-	[ $? -eq 0 -a -n "$IF" ] && echo $IF && return
+        IF=`$nvram get ${1}_ifname 2>/dev/null`
+        [ $? -eq 0 -a -n "$IF" ] && echo $IF && return
     fi
 }
 
@@ -120,17 +120,17 @@ lock()
 {
     attempts=0
     while [ $attempts -lt 10 ]; do
-	mkdir $lockDir 2>/dev/null && break
-	attempts=$((attempts+1))
-	pid=`cat $pidFile 2>/dev/null`
-	if [ -n "$pid" ]; then
-	    if [ -d "/proc/$pid" ]; then
-		[ -n "$DEBUG" ] && echo "WARNING: Lockfile detected but process $(cat $pidFile) does not exist !"
-		rm -rf $lockDir
-	    else
-		sleep 1
-	    fi
-	fi
+        mkdir $lockDir 2>/dev/null && break
+        attempts=$((attempts+1))
+        pid=`cat $pidFile 2>/dev/null`
+        if [ -n "$pid" ]; then
+            if [ -d "/proc/$pid" ]; then
+                [ -n "$DEBUG" ] && echo "WARNING: Lockfile detected but process $(cat $pidFile) does not exist !"
+                rm -rf $lockDir
+            else
+                sleep 1
+            fi
+        fi
     done
     mkdir $lockDir 2>/dev/null
     echo $$ > $pidFile
@@ -155,8 +155,8 @@ newChain()
     # Add the RRDIPT_$chain CHAIN to the $chain chain if not present
     iptables -t mangle -C $chain -j RRDIPT_$chain 2>/dev/null
     if [ $? -ne 0 ]; then
-	[ -n "$DEBUG" ] && echo "DEBUG: iptables chain misplaced, recreating it..."
-	iptables -t mangle -I $chain -j RRDIPT_$chain
+        [ -n "$DEBUG" ] && echo "DEBUG: iptables chain misplaced, recreating it..."
+        iptables -t mangle -I $chain -j RRDIPT_$chain
     fi
 }
 
@@ -168,11 +168,11 @@ newRuleIF()
     
     #!@todo test
     if [ "$chain" = "OUTPUT" ]; then
-	cmd="iptables -t mangle -o $IF -j RETURN"
-	eval $cmd " -C RRDIPT_$chain 2>/dev/null" || eval $cmd " -A RRDIPT_$chain"
+        cmd="iptables -t mangle -o $IF -j RETURN"
+        eval $cmd " -C RRDIPT_$chain 2>/dev/null" || eval $cmd " -A RRDIPT_$chain"
     elif [ "$chain" = "INPUT" ]; then
-	cmd="iptables -t mangle -i $IF -j RETURN"
-	eval $cmd " -C RRDIPT_$chain 2>/dev/null" || eval $cmd " -A RRDIPT_$chain"
+        cmd="iptables -t mangle -i $IF -j RETURN"
+        eval $cmd " -C RRDIPT_$chain 2>/dev/null" || eval $cmd " -A RRDIPT_$chain"
     fi
 }
 
@@ -189,14 +189,14 @@ update()
     lock
     # only zero our own chains
     for chain in $chains; do
-	iptables -nvxL RRDIPT_$chain -t mangle -Z >> /tmp/iptables_$$.tmp
+        iptables -nvxL RRDIPT_$chain -t mangle -Z >> /tmp/iptables_$$.tmp
     done
     # the iptables and readDB commands have to be separate. Otherwise,
     # they will fight over iptables locks
     awk -v mode="$mode" -v interfaces=\""$interfaces"\" -f $binDir/readDB.awk \
-	$DB \
-	/proc/net/arp \
-	/tmp/iptables_$$.tmp
+        $DB \
+        /proc/net/arp \
+        /tmp/iptables_$$.tmp
     unlock
 }
 
@@ -204,87 +204,87 @@ update()
 
 case $1 in
     "dump" )
-	checkDbArg
-	lock
-	tr ',' '\t' < "$DB"
-	unlock
+        checkDbArg
+        lock
+        tr ',' '\t' < "$DB"
+        unlock
     ;;
 
     "update" )
-	checkDbArg
-	wan=$(detectWAN)
-	interfaces="$interfaces $wan"
-	update
-	rm -f /tmp/*_$$.tmp
-	exit
-	;;
+        checkDbArg
+        wan=$(detectWAN)
+        interfaces="$interfaces $wan"
+        update
+        rm -f /tmp/*_$$.tmp
+        exit
+        ;;
 
     "publish" )
-	checkDbArg
-	[ -z "$3" ] && echo "ERROR: Missing argument 3 (output html file)" && exit 1
-	
-	# sort DB
-	lock
+        checkDbArg
+        [ -z "$3" ] && echo "ERROR: Missing argument 3 (output html file)" && exit 1
+        
+        # sort DB
+        lock
 
-	# busybox sort truncates numbers to 32 bits
-	grep -v '^#' $DB | awk -F, '{OFS=","; a=sprintf("%f",$4/1e6); $4=""; print a,$0}' | tr -s ',' | sort -rn | awk -F, '{OFS=",";$1=sprintf("%f",$1*1e6);print}' > /tmp/sorted_$$.tmp
+        # busybox sort truncates numbers to 32 bits
+        grep -v '^#' $DB | awk -F, '{OFS=","; a=sprintf("%f",$4/1e6); $4=""; print a,$0}' | tr -s ',' | sort -rn | awk -F, '{OFS=",";$1=sprintf("%f",$1*1e6);print}' > /tmp/sorted_$$.tmp
 
         # create HTML page
-	rm -f $3.tmp
-	cp $dataDir/usage.htm1 $3.tmp
+        rm -f $3.tmp
+        cp $dataDir/usage.htm1 $3.tmp
 
-	#!@todo fix publishing
-	while IFS=, read PEAKUSAGE_IN MAC IP IFACE PEAKUSAGE_OUT TOTAL FIRSTSEEN LASTSEEN
-	do
-	    echo "
+        #!@todo fix publishing
+        while IFS=, read PEAKUSAGE_IN MAC IP IFACE PEAKUSAGE_OUT TOTAL FIRSTSEEN LASTSEEN
+        do
+            echo "
 new Array(\"$(lookup $MAC $IP $4)\",\"$MAC\",\"$IP\",
 $PEAKUSAGE_IN,$PEAKUSAGE_OUT,$TOTAL,\"$FIRSTSEEN\",\"$LASTSEEN\")," >> $3.tmp
-	done < /tmp/sorted_$$.tmp
-	echo "0);" >> $3.tmp
-	
-	sed "s/(date)/`date`/" < $dataDir/usage.htm2 >> $3.tmp
-	mv $3.tmp $3
+        done < /tmp/sorted_$$.tmp
+        echo "0);" >> $3.tmp
+        
+        sed "s/(date)/`date`/" < $dataDir/usage.htm2 >> $3.tmp
+        mv $3.tmp $3
 
-	unlock
-	
-	#Free some memory
-	rm -f /tmp/*_$$.tmp
-	;;
+        unlock
+        
+        #Free some memory
+        rm -f /tmp/*_$$.tmp
+        ;;
     
     "setup" )
-	checkDbArg
-	[ -w "$DB" ] && echo "Warning: using existing $DB"
-	createDbIfMissing
-	
-	for chain in $chains; do
-	    newChain $chain
-	done
+        checkDbArg
+        [ -w "$DB" ] && echo "Warning: using existing $DB"
+        createDbIfMissing
+        
+        for chain in $chains; do
+            newChain $chain
+        done
 
-	#lan=$(detectLAN)
-	wan=$(detectWAN)
-	checkWAN
-	interfaces="$interfaces $wan"
+        #lan=$(detectLAN)
+        wan=$(detectWAN)
+        checkWAN
+        interfaces="$interfaces $wan"
 
-	# track local data
-	for chain in INPUT OUTPUT; do
-	    for interface in $interfaces; do
-		[ -n "$interface" ] && [ -e "/sys/class/net/$interface" ] && newRuleIF $chain $interface
-	    done
-	done
+        # track local data
+        for chain in INPUT OUTPUT; do
+            for interface in $interfaces; do
+                [ -n "$interface" ] && [ -e "/sys/class/net/$interface" ] && newRuleIF $chain $interface
+            done
+        done
 
-	# this will add rules for hosts in arp table
-	update
+        # this will add rules for hosts in arp table
+        update
 
-	rm -f /tmp/*_$$.tmp
-	;;
+        rm -f /tmp/*_$$.tmp
+        ;;
 
     "remove" )
-	iptables-save | grep -v RRDIPT | iptables-restore
-	rm -rf "$lockDir"
-	;;
+        iptables-save | grep -v RRDIPT | iptables-restore
+        rm -rf "$lockDir"
+        ;;
 
     *)
-	echo \
+        echo \
 "Usage: $0 {setup|update|publish|remove} [options...]
 Options:
    $0 setup database_file
@@ -297,5 +297,5 @@ Examples:
    $0 remove
 Note: [user_file] is an optional file to match users with MAC addresses.
        Its format is \"00:MA:CA:DD:RE:SS,username\", with one entry per line."
-	;;
+        ;;
 esac
