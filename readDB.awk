@@ -48,10 +48,10 @@ FNR==NR { #!@todo this doesn't help if the DB file is empty.
 # IPs currently match table IPs, perhaps the UI can add up the values between 
 # multiple IPs per MAC address?
     if($2 == "NA")
-	#!@todo could get interface IP here
-	n=$1
+        #!@todo could get interface IP here
+        n=$1
     else
-	n=$2
+        n=$2
 
     hosts[n] = "" # add this host/interface to hosts
     mac[n]        =  $1
@@ -79,14 +79,14 @@ fid==2 {
     arp_mac   = $4
     arp_dev   = $6
     if(arp_flags != "0x0" && !(arp_ip in ip)){
-	if(debug)
-	    print "new host:", arp_ip, arp_flags > "/dev/stderr"
-	hosts[arp_ip] = ""
-	mac[arp_ip]   = arp_mac
-	ip[arp_ip]    = arp_ip
-	inter[arp_ip] = arp_dev
-	bw[arp_ip "/in"] = bw[arp_ip "/out"] = 0
-	firstDate[arp_ip] = lastDate[arp_ip] = date()
+        if(debug)
+            print "new host:", arp_ip, arp_flags > "/dev/stderr"
+        hosts[arp_ip] = ""
+        mac[arp_ip]   = arp_mac
+        ip[arp_ip]    = arp_ip
+        inter[arp_ip] = arp_dev
+        bw[arp_ip "/in"] = bw[arp_ip "/out"] = 0
+        firstDate[arp_ip] = lastDate[arp_ip] = date()
     }
     next
 }
@@ -108,17 +108,17 @@ fid==3 && rrd && (NF < 9 || $1=="pkts"){ next }
 
 fid==3 && rrd { # iptables input
     if($6 != "*"){
-	m=$6
-	n=m "/out"
+        m=$6
+        n=m "/out"
     } else if($7 != "*"){
-	m=$7
-	n=m "/in"
+        m=$7
+        n=m "/in"
     } else if($8 != "0.0.0.0/0"){
-	m=$8
-	n=m "/out"
+        m=$8
+        n=m "/out"
     } else { # $9 != "0.0.0.0/0"
-	m=$9
-	n=m "/in"
+        m=$9
+        n=m "/in"
     }
 
     # remove host from array; any hosts left in array at END get new
@@ -129,22 +129,22 @@ fid==3 && rrd { # iptables input
     delete hosts[m]
 
     if($2 > 0){ # counted some bytes
-	if(mode == "diff" || mode == "noUpdate")
-	    print n, $2
-	if(mode!="noUpdate"){
-	    if(inInterfaces(m)){ # if label is an interface
-		if(!(m in mac)){ # if label was not in db (also not in
-				 # arp table, but interfaces won't be
-				 # there anyway)
-		    firstDate[m] = date()
-		    mac[m] = inter[m] = m
-		    ip[m] = "NA"
-		    bw[m "/in"]=bw[m "/out"]= 0
-		}
-	    }
-	    bw[n]+=$2
-	    lastDate[m] = date()
-	}
+        if(mode == "diff" || mode == "noUpdate")
+            print n, $2
+        if(mode!="noUpdate"){
+            if(inInterfaces(m)){ # if label is an interface
+                if(!(m in mac)){ # if label was not in db (also not in
+                                 # arp table, but interfaces won't be
+                                 # there anyway)
+                    firstDate[m] = date()
+                    mac[m] = inter[m] = m
+                    ip[m] = "NA"
+                    bw[m "/in"]=bw[m "/out"]= 0
+                }
+            }
+            bw[n]+=$2
+            lastDate[m] = date()
+        }
     }
 }
 
@@ -155,7 +155,7 @@ END {
     print "#mac,ip,iface,in,out,total,first_date,last_date" > dbFile
     OFS=","
     for(i in mac)
-	print mac[i], ip[i], inter[i], bw[i "/in"], bw[i "/out"], total(i), firstDate[i], lastDate[i] > dbFile
+        print mac[i], ip[i], inter[i], bw[i "/in"], bw[i "/out"], total(i), firstDate[i], lastDate[i] > dbFile
     close(dbFile)
     # for hosts without rules
     for(host in hosts) if(!inInterfaces(host)) newRule(host)
