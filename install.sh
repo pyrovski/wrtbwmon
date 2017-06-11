@@ -8,7 +8,7 @@ do_copy() {
 	else
     	    perm=0644
 	fi
-	install -m $perm -t $DESTDIR/$dest/ $file
+	install -m $perm $file $DESTDIR/$dest/
     done
 }
 
