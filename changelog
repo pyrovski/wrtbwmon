@@ -1,3 +1,9 @@
+wrtbwmon (0.36) UNRELEASED; urgency=medium
+
+  * Packaging changes: remove .sh extension from init script, use 'tar' for final packing step.
+
+ -- Peter Bailey <peter.eldridge.bailey@gmail.com>  Sun, 15 Jan 2017 19:16:40 -0800
+
 wrtbwmon (0.35) unstable; urgency=low
 
   * Added deb package, changed back to wrtbwmon from wrtbwmon.sh

@@ -1,6 +1,6 @@
 DESTDIR?=/
-install-files=wrtbwmon readDB.awk $(wildcard usage.htm*) init/wrtbwmon
-ipk-files=control
+install-files=$(shell grep -v CONTROL fileMap  | cut -d: -f2- | tr -d '\n')
+ipk-files=$(shell grep CONTROL fileMap | cut -d: -f2-)
 version:=$(shell egrep '^Version:' ./control | awk '{print $$2}')
 target=wrtbwmon_$(version)_all.ipk
 
@@ -15,6 +15,9 @@ install: $(install-files)
 deb:
 	gbp buildpackage -Pdebian --git-ignore-new
 
-.PHONY: deb install
+clean:
+	rm -f *.ipk
+
+.PHONY: deb install clean
 
 .SUFFIXES:
