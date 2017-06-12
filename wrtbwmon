@@ -57,14 +57,15 @@ lookup()
     MAC=$1
     IP=$2
     userDB=$3
-    for USERSFILE in $userDB /tmp/dhcp.leases /tmp/dnsmasq.conf /etc/dnsmasq.conf /etc/hosts; do
+    FILES="$userDB /tmp/dhcp.leases /tmp/dnsmasq.conf /etc/dnsmasq.conf /etc/hosts"
+    for USERSFILE in $FILES; do
 	[ -e "$USERSFILE" ] || continue
-	case $USERSFILE in
+	case "$USERSFILE" in
 	    /tmp/dhcp.leases )
-		USER=$(grep -i "$MAC" $USERSFILE | cut -f4 -s -d' ')
+		USER=$(grep -i "$MAC" "$USERSFILE" | cut -f4 -s -d' ')
 		;;
 	    /etc/hosts )
-		USER=$(grep "^$IP " $USERSFILE | cut -f2 -s -d' ')
+		USER=$(grep "^$IP " "$USERSFILE" | cut -f2 -s -d' ')
 		;;
 	    * )
 		USER=$(grep -i "$MAC" "$USERSFILE" | cut -f2 -s -d,)
