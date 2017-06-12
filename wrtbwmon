@@ -21,7 +21,7 @@ nvram=`which nvram 2>/dev/null`
 
 chains='INPUT OUTPUT FORWARD'
 DEBUG=
-interfaces='eth0 tun0' # in addition to detected WAN
+interfaces='eth0 eth1 eth2 br0 tun0' # in addition to detected WAN
 DB=$2
 mode=
 
@@ -57,14 +57,15 @@ lookup()
     MAC=$1
     IP=$2
     userDB=$3
-    for USERSFILE in $userDB /tmp/dhcp.leases /tmp/dnsmasq.conf /etc/dnsmasq.conf /etc/hosts; do
+    FILES="$userDB /tmp/dhcp.leases /tmp/dnsmasq.conf /etc/dnsmasq.conf /etc/hosts"
+    for USERSFILE in $FILES; do
 	[ -e "$USERSFILE" ] || continue
-	case $USERSFILE in
+	case "$USERSFILE" in
 	    /tmp/dhcp.leases )
-		USER=$(grep -i "$MAC" $USERSFILE | cut -f4 -s -d' ')
+		USER=$(grep -i "$MAC" "$USERSFILE" | cut -f4 -s -d' ')
 		;;
 	    /etc/hosts )
-		USER=$(grep "^$IP " $USERSFILE | cut -f2 -s -d' ')
+		USER=$(grep "^$IP " "$USERSFILE" | cut -f2 -s -d' ')
 		;;
 	    * )
 		USER=$(grep -i "$MAC" "$USERSFILE" | cut -f2 -s -d,)
@@ -229,7 +230,7 @@ case $1 in
 	# busybox sort truncates numbers to 32 bits
 	grep -v '^#' $DB | awk -F, '{OFS=","; a=sprintf("%f",$4/1e6); $4=""; print a,$0}' | tr -s ',' | sort -rn | awk -F, '{OFS=",";$1=sprintf("%f",$1*1e6);print}' > /tmp/sorted_$$.tmp
 
-        # create HTML page
+	# create HTML page
 	rm -f $3.tmp
 	cp $dataDir/usage.htm1 $3.tmp
 
@@ -265,7 +266,7 @@ $PEAKUSAGE_IN,$PEAKUSAGE_OUT,$TOTAL,\"$FIRSTSEEN\",\"$LASTSEEN\")," >> $3.tmp
 	checkWAN
 	interfaces="$interfaces $wan"
 
-	# track local data
+	#!todo use /proc/net/dev for this.
 	for chain in INPUT OUTPUT; do
 	    for interface in $interfaces; do
 		[ -n "$interface" ] && [ -e "/sys/class/net/$interface" ] && newRuleIF $chain $interface
