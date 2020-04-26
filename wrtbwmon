@@ -185,12 +185,11 @@ update()
     checkDB
     checkWAN
 
-    > /tmp/iptables_$$.tmp
     lock
     # only zero our own chains
     for chain in $chains; do
-	iptables -nvxL RRDIPT_$chain -t mangle -Z >> /tmp/iptables_$$.tmp
-    done
+	iptables -nvxL RRDIPT_$chain -t mangle -Z
+    done > /tmp/iptables_$$.tmp
     # the iptables and readDB commands have to be separate. Otherwise,
     # they will fight over iptables locks
     awk -v mode="$mode" -v interfaces=\""$interfaces"\" -f $binDir/readDB.awk \
@@ -227,7 +226,8 @@ case $1 in
 	lock
 
 	# busybox sort truncates numbers to 32 bits
-	grep -v '^#' $DB | awk -F, '{OFS=","; a=sprintf("%f",$4/1e6); $4=""; print a,$0}' | tr -s ',' | sort -rn | awk -F, '{OFS=",";$1=sprintf("%f",$1*1e6);print}' > /tmp/sorted_$$.tmp
+	grep -v '^#' $DB | awk -F, '{OFS=","; a=sprintf("%f",$4/1e6); $4=""; print a,$0}' | \
+            tr -s ',' | sort -rn | awk -F, '{OFS=",";$1=sprintf("%f",$1*1e6);print}' > /tmp/sorted_$$.tmp
 
         # create HTML page
 	rm -f $3.tmp
@@ -238,8 +238,8 @@ case $1 in
 	do
 	    echo "
 new Array(\"$(lookup $MAC $IP $4)\",\"$MAC\",\"$IP\",
-$PEAKUSAGE_IN,$PEAKUSAGE_OUT,$TOTAL,\"$FIRSTSEEN\",\"$LASTSEEN\")," >> $3.tmp
-	done < /tmp/sorted_$$.tmp
+$PEAKUSAGE_IN,$PEAKUSAGE_OUT,$TOTAL,\"$FIRSTSEEN\",\"$LASTSEEN\"),"
+	done < /tmp/sorted_$$.tmp >> $3.tmp
 	echo "0);" >> $3.tmp
 	
 	sed "s/(date)/`date`/" < $dataDir/usage.htm2 >> $3.tmp
@@ -260,7 +260,6 @@ $PEAKUSAGE_IN,$PEAKUSAGE_OUT,$TOTAL,\"$FIRSTSEEN\",\"$LASTSEEN\")," >> $3.tmp
 	    newChain $chain
 	done
 
-	#lan=$(detectLAN)
 	wan=$(detectWAN)
 	checkWAN
 	interfaces="$interfaces $wan"
