@@ -18,6 +18,10 @@ networkFuncs=/lib/functions/network.sh
 uci=`which uci 2>/dev/null`
 nslookup=`which nslookup 2>/dev/null`
 nvram=`which nvram 2>/dev/null`
+ip=/usr/sbin/ip
+[ -x $ip ] || ip=`which ip`
+
+ipv6=1
 
 chains='INPUT OUTPUT FORWARD'
 DEBUG=
@@ -57,7 +61,7 @@ lookup()
     MAC=$1
     IP=$2
     userDB=$3
-    for USERSFILE in $userDB /tmp/dhcp.leases /tmp/dnsmasq.conf /etc/dnsmasq.conf /etc/hosts; do
+    for USERSFILE in $userDB /tmp/dhcp.leases /tmp/hosts/dhcp.* /tmp/dnsmasq.conf /etc/dnsmasq.conf /etc/hosts; do
 	[ -e "$USERSFILE" ] || continue
 	case $USERSFILE in
 	    /tmp/dhcp.leases )
@@ -145,33 +149,32 @@ unlock()
     trap "rm -f /tmp/*_$$.tmp; kill $$" INT
 }
 
-# chain
 newChain()
 {
     chain=$1
+    iptables=$2
     # Create the RRDIPT_$chain chain (it doesn't matter if it already exists).
-    iptables -t mangle -N RRDIPT_$chain 2> /dev/null
+    $iptables -t mangle -N RRDIPT_$chain 2> /dev/null
     
     # Add the RRDIPT_$chain CHAIN to the $chain chain if not present
-    iptables -t mangle -C $chain -j RRDIPT_$chain 2>/dev/null
+    $iptables -t mangle -C $chain -j RRDIPT_$chain 2>/dev/null
     if [ $? -ne 0 ]; then
 	[ -n "$DEBUG" ] && echo "DEBUG: iptables chain misplaced, recreating it..."
-	iptables -t mangle -I $chain -j RRDIPT_$chain
+	$iptables -t mangle -I $chain -j RRDIPT_$chain
     fi
 }
 
-# chain tun
 newRuleIF()
 {
     chain=$1
     IF=$2
+    iptables=$3
     
-    #!@todo test
     if [ "$chain" = "OUTPUT" ]; then
-	cmd="iptables -t mangle -o $IF -j RETURN"
+	cmd="$iptables -t mangle -o $IF -j RETURN"
 	eval $cmd " -C RRDIPT_$chain 2>/dev/null" || eval $cmd " -A RRDIPT_$chain"
     elif [ "$chain" = "INPUT" ]; then
-	cmd="iptables -t mangle -i $IF -j RETURN"
+	cmd="$iptables -t mangle -i $IF -j RETURN"
 	eval $cmd " -C RRDIPT_$chain 2>/dev/null" || eval $cmd " -A RRDIPT_$chain"
     fi
 }
@@ -185,17 +188,26 @@ update()
     checkDB
     checkWAN
 
-    > /tmp/iptables_$$.tmp
     lock
+
+    if [ $ipv6 -eq 1 ]; then
+        $ip -f inet6 neigh show
+    fi > /tmp/ipv6_neighbours_$$.tmp 2>/dev/null
+
     # only zero our own chains
     for chain in $chains; do
-	iptables -nvxL RRDIPT_$chain -t mangle -Z >> /tmp/iptables_$$.tmp
-    done
+	iptables -nvxL RRDIPT_$chain -t mangle -Z
+	if [ $ipv6 -eq 1 ]; then 
+            ip6tables -nvxL RRDIPT_$chain -t mangle -Z
+        fi
+    done > /tmp/iptables_$$.tmp
     # the iptables and readDB commands have to be separate. Otherwise,
     # they will fight over iptables locks
-    awk -v mode="$mode" -v interfaces=\""$interfaces"\" -f $binDir/readDB.awk \
+    awk -v mode="$mode" -v interfaces=\""$interfaces"\" -v ipv6="$ipv6" \
+	-f $binDir/readDB.awk \
 	$DB \
 	/proc/net/arp \
+	/tmp/ipv6_neighbours_$$.tmp \
 	/tmp/iptables_$$.tmp
     unlock
 }
@@ -227,19 +239,19 @@ case $1 in
 	lock
 
 	# busybox sort truncates numbers to 32 bits
-	grep -v '^#' $DB | awk -F, '{OFS=","; a=sprintf("%f",$4/1e6); $4=""; print a,$0}' | tr -s ',' | sort -rn | awk -F, '{OFS=",";$1=sprintf("%f",$1*1e6);print}' > /tmp/sorted_$$.tmp
+	grep -v '^#' $DB | awk -F, '{OFS=","; a=sprintf("%f",$4/1e6); $4=""; print a,$0}' | \
+            tr -s ',' | sort -rn | awk -F, '{OFS=",";$1=sprintf("%f",$1*1e6);print}' > /tmp/sorted_$$.tmp
 
         # create HTML page
 	rm -f $3.tmp
 	cp $dataDir/usage.htm1 $3.tmp
 
-	#!@todo fix publishing
 	while IFS=, read PEAKUSAGE_IN MAC IP IFACE PEAKUSAGE_OUT TOTAL FIRSTSEEN LASTSEEN
 	do
 	    echo "
 new Array(\"$(lookup $MAC $IP $4)\",\"$MAC\",\"$IP\",
-$PEAKUSAGE_IN,$PEAKUSAGE_OUT,$TOTAL,\"$FIRSTSEEN\",\"$LASTSEEN\")," >> $3.tmp
-	done < /tmp/sorted_$$.tmp
+$PEAKUSAGE_IN,$PEAKUSAGE_OUT,$TOTAL,\"$FIRSTSEEN\",\"$LASTSEEN\"),"
+	done < /tmp/sorted_$$.tmp >> $3.tmp
 	echo "0);" >> $3.tmp
 	
 	sed "s/(date)/`date`/" < $dataDir/usage.htm2 >> $3.tmp
@@ -257,10 +269,12 @@ $PEAKUSAGE_IN,$PEAKUSAGE_OUT,$TOTAL,\"$FIRSTSEEN\",\"$LASTSEEN\")," >> $3.tmp
 	createDbIfMissing
 	
 	for chain in $chains; do
-	    newChain $chain
+	    newChain $chain iptables
+	    if [ $ipv6 -eq 1 ]; then
+	        newChain $chain ip6tables
+            fi
 	done
 
-	#lan=$(detectLAN)
 	wan=$(detectWAN)
 	checkWAN
 	interfaces="$interfaces $wan"
@@ -268,7 +282,12 @@ $PEAKUSAGE_IN,$PEAKUSAGE_OUT,$TOTAL,\"$FIRSTSEEN\",\"$LASTSEEN\")," >> $3.tmp
 	# track local data
 	for chain in INPUT OUTPUT; do
 	    for interface in $interfaces; do
-		[ -n "$interface" ] && [ -e "/sys/class/net/$interface" ] && newRuleIF $chain $interface
+		if [ -n "$interface" -a -e "/sys/class/net/$interface" ]; then
+		  newRuleIF $chain $interface iptables
+		  if [ $ipv6 -eq 1 ]; then
+		      newRuleIF $chain $interface ip6tables
+		  fi
+		fi
 	    done
 	done
 
@@ -280,6 +299,8 @@ $PEAKUSAGE_IN,$PEAKUSAGE_OUT,$TOTAL,\"$FIRSTSEEN\",\"$LASTSEEN\")," >> $3.tmp
 
     "remove" )
 	iptables-save | grep -v RRDIPT | iptables-restore
+	# Remove IPv6 rules regardless of ipv6 setting
+        ip6tables-save | grep -v RRDIPT | ip6tables-restore
 	rm -rf "$lockDir"
 	;;
 
