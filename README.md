@@ -1,7 +1,10 @@
 # wrtbwmon
 Modified from https://code.google.com/p/wrtbwmon/.
 
-## New features
+## Testers needed for IPv6 support
+Experimental release: https://github.com/pyrovski/wrtbwmon/releases/tag/0.37_ipv6
+
+## Features
  - "User" column has mouseover text containing MAC and IP addresses
  - "First seen" and "Total" columns in usage table
  - Monitoring of locally generated traffic on a per-interface basis
