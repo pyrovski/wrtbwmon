@@ -16,7 +16,7 @@ base=`basename $0`
 if [ "$base" = "mkipk.sh" ]; then
     DESTDIR=$(mktemp -d)
     do_copy $*
-    fakeroot -- ipkg-build -c $DESTDIR
+    fakeroot -- ./ipkg-build -c $DESTDIR
     rm -rf $DESTDIR
 else
     DESTDIR=${DESTDIR:-"/"}
