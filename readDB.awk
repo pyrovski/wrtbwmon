@@ -41,14 +41,15 @@ BEGIN {
 }
 
 # data from database; first file
+# mac ip iface in out total first_date last_date
 FNR==NR { #!@todo this doesn't help if the DB file is empty.
     if($2 == "NA")
-	#!@todo could get interface IP here
+	#!@todo could get interface IP(s) here
 	n=$1
     else
 	n=$2
 
-    hosts[n] = "" # add this host/interface to hosts
+    hosts[n] = "" # add this IP address/interface to hosts
     mac[n]        =  $1
     ip[n]         =  $2
     inter[n]      =  $3
